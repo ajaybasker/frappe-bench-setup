@@ -1,6 +1,6 @@
 {
   "name": "frappe-setup-cli",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "One-command, guided and verified Frappe Framework / ERPNext development environment installer (launches the bundled Python installer)",
   "license": "MIT",
   "repository": {
