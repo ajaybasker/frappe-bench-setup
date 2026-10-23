@@ -185,6 +185,19 @@ tested:
     mariadb: "10.11.14 (Ubuntu)"
     redis: "7.0.15 (Ubuntu)"
     bench_cli: "5.31.0"
+    apps: [frappe, erpnext 15.124.1]
+    result: "pass: one-command fresh install 367s, /api/method/ping=pong, rerun idempotent (19s), no secrets in logs/state/output"
+  - platform: ubuntu-24.04.5-x86_64 (Docker, non-root sudo user, no systemd)
+    frappe_branch: version-15
+    frappe_version: 15.124.0
+    frappe_commit: f1cf50cf9b
+    date: "2026-10-23"
+    python: "3.12.3 (Ubuntu system)"
+    node: "20.20.2 (nodejs.org, managed)"
+    yarn: "1.22.22"
+    mariadb: "10.11.14 (Ubuntu)"
+    redis: "7.0.15 (Ubuntu)"
+    bench_cli: "5.31.0"
     apps: [frappe]
     result: >-
       pass via `frappe-setup resume` after the first run failed on a Yarn-detection bug (fixed, regression

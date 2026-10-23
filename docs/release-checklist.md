@@ -13,5 +13,5 @@
 - [ ] Record each passing run in the `tested:` section of the matrix and the README test table
       (platform, date, versions, result). Never record runs that did not pass.
 - [ ] Interactive smoke test on a real Ubuntu 24.04 VM: `./install.sh`, accept defaults, open the site.
-- [ ] Replace `ORG` in README clone URL; bump `version` in `pyproject.toml` and `src/frappe_setup/__init__.py`.
+- [ ] Check the README clone URL matches the published repository; bump `version` in `pyproject.toml` and `src/frappe_setup/__init__.py`.
 - [ ] Tag the release.

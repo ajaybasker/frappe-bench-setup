@@ -32,7 +32,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-docker run -d --name "${NAME}" -v "${REPO}:/src:ro" "${IMAGE}" sleep infinity >/dev/null
+docker run -d --init --name "${NAME}" -v "${REPO}:/src:ro" "${IMAGE}" sleep infinity >/dev/null
 
 # Secrets are generated per run, written to 0600 files, and never passed as arguments.
 ADMIN_PW="Adm-$(head -c 12 /dev/urandom | od -An -tx1 | tr -d ' \n')"

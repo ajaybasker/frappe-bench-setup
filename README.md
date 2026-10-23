@@ -3,8 +3,8 @@
 **One command to get a working, verified Frappe Framework development environment.**
 
 ```bash
-git clone https://github.com/ORG/frappe-setup-cli.git
-cd frappe-setup-cli
+git clone https://github.com/ajaybasker/frappe-bench-setup.git
+cd frappe-bench-setup
 ./install.sh
 ```
 
@@ -19,8 +19,6 @@ cd ~/frappe-projects/frappe-bench
 bench start
 # open http://localhost:8000  →  login: Administrator / the password you chose
 ```
-
-> Replace `ORG` with the GitHub organisation that hosts this repository.
 
 ---
 
@@ -322,13 +320,14 @@ passwords. It never touches the host. Project layout: [docs/architecture.md](doc
 ### Test results
 
 <!-- TEST-RESULTS:START -->
-**Unit tests (executed):** 304 passed, 1 skipped (the opt-in network test). ruff and mypy clean.
+**Unit tests (executed):** 308 passed, 1 skipped (the opt-in network test). ruff and mypy clean.
 
 **End-to-end (executed, 2026-10-23, clean Ubuntu 24.04.5 x86_64 Docker container, non-root sudo user):**
 
 | Frappe | Apps | Runtimes used | Result |
 |--------|------|---------------|--------|
 | version-16 (16.53.0) | frappe | Python 3.14.9 (uv), Node 24.22.1, MariaDB 11.8.9 (official repo) | **PASS** — fresh install 6 min 17 s, site answered `/api/method/ping`, rerun reused everything (15 s), no passwords in logs/state/output |
+| version-15 (15.124.0) | frappe + **ERPNext 15.124.1** | Python 3.12.3 (Ubuntu), Node 20.20.2, MariaDB 10.11.14 (Ubuntu) | **PASS** — fresh one-command install 6 min 7 s, ERPNext installed on the site, ping OK, rerun reused everything (19 s), no passwords leaked |
 | version-15 (15.124.0) | frappe | Python 3.12.3 (Ubuntu), Node 20.20.2, MariaDB 10.11.14 (Ubuntu) | **PASS via `resume`** — the first run exposed a Yarn-detection bug (fixed + regression test); `resume` then completed, ping OK, rerun 20 s, `doctor` clean, no passwords leaked |
 
 **Also executed:** the interactive wizard through a real terminal (PTY) on a provisioned Ubuntu 24.04
