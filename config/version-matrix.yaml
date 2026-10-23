@@ -1,0 +1,163 @@
+# Frappe Setup CLI — version compatibility matrix.
+#
+# Sections per branch:
+#   documented     Requirements published upstream. Sources:
+#                    - https://docs.frappe.io/framework/user/en/installation (requirements table)
+#                    - frappe/frappe <branch>: pyproject.toml `requires-python`, package.json `engines`
+#                    - frappe/frappe <branch>: frappe/database/mariadb/setup_db.py version warnings
+#   upstream_ci    Versions used by frappe/frappe GitHub Actions server tests on that branch.
+#   install        What this tool installs when nothing compatible is present.
+#   tested         Combinations verified end-to-end by this project (filled from real runs only).
+#
+# At run time the tool re-reads requires-python / engines.node / __version__ from the
+# resolved branch and uses the stricter of upstream and this file.
+#
+# Last reviewed: 2026-10-23
+
+schema_version: 1
+
+frappe_repository: https://github.com/frappe/frappe
+
+bench_cli:
+  package: frappe-bench
+  documented: ">=5.0"
+  install_method: "uv tool install frappe-bench"
+
+platforms:
+  # Only platforms listed with status "supported" run without --allow-untested-platform.
+  - id: ubuntu
+    version: "24.04"
+    codename: noble
+    architectures: [x86_64]
+    status: supported
+  - id: ubuntu
+    version: "24.04"
+    codename: noble
+    architectures: [aarch64]
+    status: untested
+  - id: debian
+    version: "12"
+    codename: bookworm
+    architectures: [x86_64, aarch64]
+    status: untested
+  - id: debian
+    version: "13"
+    codename: trixie
+    architectures: [x86_64, aarch64]
+    status: untested
+
+resources:
+  # Measured on disposable Ubuntu 24.04 containers; see docs/supported-platforms.md.
+  min_ram_mb: 2048
+  recommended_ram_mb: 4096
+  min_free_disk_gb: 4
+  recommended_free_disk_gb: 10
+  free_disk_per_large_app_gb: 2
+
+ports:
+  # Bench defaults; a second bench in the same parent directory gets incremented ports.
+  webserver: 8000
+  socketio: 9000
+  redis_queue: 11000
+  redis_cache: 13000
+  file_watcher: 6787
+
+apt_packages:
+  # Ubuntu/Debian package names. Grouped so that the plan can explain why each is needed.
+  base: [git, curl, ca-certificates, gnupg]
+  build: [build-essential, pkg-config, python3-dev, python3-venv, libffi-dev, libssl-dev]
+  mariadb_client_libs: [libmariadb-dev]
+  mariadb_server: [mariadb-server, mariadb-client]
+  postgres_client: [libpq-dev, postgresql-client]
+  redis: [redis-server]
+  pdf_wkhtmltopdf: [xvfb, libfontconfig1, wkhtmltopdf]
+  cron: [cron]
+
+mariadb_repository:
+  # Used only when the branch needs a MariaDB series newer than the distribution ships,
+  # and MariaDB server is not installed yet.
+  url: https://deb.mariadb.org
+  key_url: https://mariadb.org/mariadb_release_signing_key.pgp
+  key_fingerprint: 177F4010FE56CA3336300305F1656F24C74CD1D8
+  keyring_path: /usr/share/keyrings/mariadb-keyring.pgp
+  sources_path: /etc/apt/sources.list.d/mariadb.sources
+
+branches:
+  version-15:
+    label: "Frappe v15 (stable)"
+    major: 15
+    documented:
+      python: ">=3.10,<3.15"
+      node: ">=18"
+      yarn: ">=1.12,<2"
+      pip: ">=20"
+      mariadb: ">=10.6.6"
+      mariadb_upstream_warns_above: "10.8"
+      postgres: ">=12"
+      redis: ">=6"
+      wkhtmltopdf: "0.12.6 with patched Qt recommended (optional, PDF generation)"
+    upstream_ci:
+      python: "3.10"
+      node: "18"
+      mariadb: "10.6.24"
+      postgres: "12.4"
+    install:
+      python: "3.12"
+      node_major: 20
+      mariadb_series: distribution
+    needs_wkhtmltopdf: true
+    erpnext_branch: version-15
+
+  version-16:
+    label: "Frappe v16 (stable)"
+    major: 16
+    documented:
+      python: ">=3.14,<3.15"
+      node: ">=24"
+      yarn: ">=1.22,<2"
+      pip: ">=25.3"
+      mariadb: ">=11.8"
+      mariadb_upstream_warns_above: "11.8"
+      postgres: ">=12"
+      redis: ">=6"
+      wkhtmltopdf: "0.12.6 with patched Qt recommended (optional, PDF generation)"
+    upstream_ci:
+      python: "3.14"
+      node: "24"
+      mariadb: "11.8"
+      postgres: "18.0"
+    install:
+      python: "3.14"
+      node_major: 24
+      mariadb_series: "11.8"
+    needs_wkhtmltopdf: true
+    erpnext_branch: version-16
+
+  develop:
+    label: "Frappe develop (v17 pre-release, unstable)"
+    major: 17
+    unstable: true
+    documented:
+      python: ">=3.14,<3.15"
+      node: ">=24"
+      yarn: ">=1.22,<2"
+      pip: ">=25.3"
+      mariadb: ">=11.8"
+      mariadb_upstream_warns_above: "11.8"
+      postgres: ">=12"
+      redis: ">=6"
+      wkhtmltopdf: "not required (v17 renders PDFs with Chromium managed by Bench)"
+    upstream_ci:
+      python: "3.14"
+      node: "24"
+      mariadb: "11.8"
+      postgres: "18.0"
+    install:
+      python: "3.14"
+      node_major: 24
+      mariadb_series: "11.8"
+    needs_wkhtmltopdf: false
+    erpnext_branch: develop
+
+# Filled only from real end-to-end runs (tests/integration). Empty means "not verified".
+tested: []

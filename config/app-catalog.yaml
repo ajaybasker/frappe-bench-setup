@@ -1,0 +1,69 @@
+# Official Frappe applications offered by the wizard.
+#
+# Only repository URLs are recorded here. Branches, app names, required_apps and
+# framework constraints are NOT hardcoded: they are resolved from the repository at run
+# time (git ls-remote + pyproject.toml / hooks.py of the chosen branch).
+#
+# The branch offered by default is the one named like the Frappe branch (e.g.
+# version-16) when it exists; otherwise the user must pick one explicitly.
+#
+# Last reviewed: 2026-10-23 (all URLs answered `git ls-remote`).
+
+schema_version: 1
+
+apps:
+  - key: erpnext
+    title: ERPNext
+    description: ERP (accounting, inventory, sales, purchase, manufacturing)
+    repository: https://github.com/frappe/erpnext
+    mariadb_only: true
+  - key: hrms
+    title: Frappe HR
+    description: HR and payroll (requires ERPNext)
+    repository: https://github.com/frappe/hrms
+    mariadb_only: true
+  - key: payments
+    title: Payments
+    description: Payment gateway integrations
+    repository: https://github.com/frappe/payments
+  - key: crm
+    title: Frappe CRM
+    description: Customer relationship management
+    repository: https://github.com/frappe/crm
+  - key: helpdesk
+    title: Helpdesk
+    description: Ticketing and customer support (requires Telephony)
+    repository: https://github.com/frappe/helpdesk
+  - key: telephony
+    title: Telephony
+    description: Telephony integrations used by CRM/Helpdesk
+    repository: https://github.com/frappe/telephony
+  - key: lms
+    title: Frappe Learning
+    description: Learning management system (requires Payments)
+    repository: https://github.com/frappe/lms
+  - key: education
+    title: Education
+    description: Education management (requires ERPNext)
+    repository: https://github.com/frappe/education
+    mariadb_only: true
+  - key: wiki
+    title: Wiki
+    description: Knowledge base / wiki
+    repository: https://github.com/frappe/wiki
+  - key: builder
+    title: Builder
+    description: Visual website builder
+    repository: https://github.com/frappe/builder
+  - key: insights
+    title: Insights
+    description: Reporting and BI
+    repository: https://github.com/frappe/insights
+  - key: drive
+    title: Drive
+    description: File storage and sharing
+    repository: https://github.com/frappe/drive
+  - key: print_designer
+    title: Print Designer
+    description: Visual print format designer
+    repository: https://github.com/frappe/print_designer
