@@ -25,7 +25,7 @@ v16 needs Python 3.14 and Node 24), and the failure messages rarely point at the
 ## 3. Non-goals
 
 - Production deployment (nginx, supervisor, TLS, `bench setup production`).
-- Operating systems other than Ubuntu 24.04 x86-64 are **not claimed** as supported (the code is
+- Operating systems other than Ubuntu 24.04 / 26.04 x86-64 are **not claimed** as supported (the code is
   structured so that other Debian-family releases can be added once tested).
 - Managing an existing production bench.
 

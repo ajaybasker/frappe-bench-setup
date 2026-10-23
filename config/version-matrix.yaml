@@ -226,3 +226,27 @@ tested:
     mariadb: "10.11.14 (Ubuntu)"
     apps: [frappe, erpnext version-15]
     result: "pass: fresh install 393s, /api/method/ping=pong, status/doctor via npx, rerun idempotent (27s), no secrets in logs/state/npm cache"
+  - platform: ubuntu-26.04.1-x86_64 (Docker, non-root sudo user, no systemd)
+    frappe_branch: version-16
+    frappe_version: 16.53.0
+    frappe_commit: e8d41dd006
+    date: "2026-10-23"
+    python: "3.14.4 (Ubuntu system)"
+    node: "24.22.1 (nodejs.org, managed)"
+    mariadb: "11.8.6 (Ubuntu)"
+    redis: "8.0.5 (Ubuntu)"
+    bench_cli: "5.31.0"
+    apps: [frappe]
+    result: "pass: fresh install 528s, /api/method/ping=pong, status/doctor ok, rerun idempotent (45s), no secrets in logs/state/output"
+  - platform: ubuntu-26.04.1-x86_64 (Docker, non-root sudo user, no systemd)
+    frappe_branch: version-15
+    frappe_version: 15.124.0
+    frappe_commit: f1cf50cf9b
+    date: "2026-10-23"
+    python: "3.14.4 (Ubuntu system)"
+    node: "20.20.2 (nodejs.org, managed)"
+    mariadb: "11.8.6 (Ubuntu)"
+    redis: "8.0.5 (Ubuntu)"
+    bench_cli: "5.31.0"
+    apps: [frappe, erpnext version-15]
+    result: "pass: one-command fresh install 921s, /api/method/ping=pong, rerun idempotent (40s), no secrets in logs/state/output"

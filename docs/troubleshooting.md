@@ -16,13 +16,14 @@ Every error panel shows **Phase**, **Command**, **Exit code**, **Likely cause**,
 | Symptom (in the error or log) | Cause | Fix |
 |-------------------------------|-------|-----|
 | `Python's venv module is not available` (install.sh) | Ubuntu without `python3-venv` | Answer `y`, or `sudo apt install python3.12-venv` |
-| `Operating system … not supported` | Not Ubuntu 24.04 x86_64 | Use an Ubuntu 24.04 VM/container (or `--allow-untested-platform` for Debian/arm64 at your own risk) |
+| `Operating system … not supported` | Not Ubuntu 24.04 / 26.04 x86_64 | Use an Ubuntu 24.04 or 26.04 VM/container (or `--allow-untested-platform` for Debian/arm64 at your own risk) |
 | `Bench should not be run as root` | Running as root | Create a regular sudo user and run as that user |
 | `MariaDB 10.11 is older than the Frappe v16 requirement` | v16 needs MariaDB 11.8; an older server is installed | Use version-15, upgrade MariaDB yourself, use a fresh VM, or `--allow-db-version-mismatch` |
 | `The database rejected the credentials for 'root'` | Wrong password, or root uses socket login only | Re-enter; on a fresh MariaDB let the installer enable password login; or `sudo mariadb-secure-installation` |
 | `Cannot connect to mariadb at 127.0.0.1:3306` | Service not running | `sudo systemctl start mariadb`; `systemctl status mariadb` |
 | `Could not get lock /var/lib/dpkg/lock` | Another apt / Software Updater is running | Wait for it, then resume |
 | `Failed to fetch http://…`, `Unable to fetch some archives`, or apt hangs on one package | Mirror outage, or the network blocks some plain-HTTP downloads (seen in testing: one `.deb` blocked over HTTP on every mirror, fine over HTTPS) | Retry; if it persists set `URIs: https://mirrors.edge.kernel.org/ubuntu/` in `/etc/apt/sources.list.d/ubuntu.sources`, `sudo apt-get update`, then resume |
+| `wkhtmltopdf` check fails with "no longer packages wkhtmltopdf" | Ubuntu 26.04 dropped the package | Drop `--wkhtmltopdf`, or install the patched-Qt `.deb` from https://github.com/wkhtmltopdf/packaging/releases and rerun |
 | `dpkg was interrupted` | An earlier apt run was killed | `sudo dpkg --configure -a`, then resume |
 | `sudo needs a password but the installer is running non-interactively` | `--non-interactive` without cached sudo | Run `sudo -v` first, or run interactively |
 | `Could not resolve host`, `ETIMEDOUT`, `early EOF` | Network / proxy | Fix connectivity (`https_proxy` if needed); resume is safe |
@@ -44,7 +45,7 @@ Every error panel shows **Phase**, **Command**, **Exit code**, **Likely cause**,
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | `npm error 404 Not Found - GET https://registry.npmjs.org/frappe-setup-cli` | The package has not been published to npm yet | Use `./install.sh` from a git checkout, or `npm pack` and `npx --package ./frappe-setup-cli-1.0.0.tgz frappe-setup-cli` |
-| `x Frappe Setup CLI runs on Linux only` | macOS / Windows | Use an Ubuntu 24.04 VM or container (WSL2 is Linux but untested) |
+| `x Frappe Setup CLI runs on Linux only` | macOS / Windows | Use an Ubuntu 24.04 or 26.04 VM or container (WSL2 is Linux but untested) |
 | `x Python 3.10+ was not found on PATH` | No usable `python3` | `sudo apt install python3 python3-venv` |
 | `x Node.js 18+ is required` | Old Node.js running npx | Upgrade Node.js (nodejs.org or nvm) — the bench's own Node.js is handled separately |
 | `x The package is incomplete` | Corrupted npm cache / partial install | `npx clear-npx-cache` or `npm install -g frappe-setup-cli` again |

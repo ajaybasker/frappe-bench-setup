@@ -52,8 +52,8 @@ Every command shown below as `./install.sh <command>` works the same as `npx fra
 
 | | Needed before you start | Installed for you (with permission) |
 |---|---|---|
-| **npm launcher** | Linux, Node.js ≥ 18 with npm/npx, `bash`, Python ≥ 3.10 (preinstalled on Ubuntu 24.04) | `python3-venv` if missing (asks first) and a private Python environment for the installer in `~/.local/share/frappe-setup/npm-runtime/` |
-| **Frappe itself** | Ubuntu 24.04 x86_64, a regular user with `sudo` | build tools, MariaDB, Redis, a compatible Python, Node.js and Yarn for the bench, the Bench CLI — see [Prerequisites](#prerequisites) |
+| **npm launcher** | Linux, Node.js ≥ 18 with npm/npx, `bash`, Python ≥ 3.10 (preinstalled on Ubuntu 24.04 and 26.04) | `python3-venv` if missing (asks first) and a private Python environment for the installer in `~/.local/share/frappe-setup/npm-runtime/` |
+| **Frappe itself** | Ubuntu 24.04 or 26.04 x86_64, a regular user with `sudo` | build tools, MariaDB, Redis, a compatible Python, Node.js and Yarn for the bench, the Bench CLI — see [Prerequisites](#prerequisites) |
 
 The Node.js that runs `npx` is only used to launch the installer. The bench gets the Node.js version its
 Frappe branch requires (e.g. 24 for v16), installed in user space if your system Node.js doesn't fit;
@@ -105,8 +105,9 @@ passwords never appear on the command line or in logs, and every step can be saf
 | Platform | Status |
 |----------|--------|
 | Ubuntu 24.04 LTS, x86_64 | **Supported** (see [verified results](#test-results)) |
-| Ubuntu 24.04 aarch64, Debian 12/13 | In the matrix but **untested** — refused unless `--allow-untested-platform` |
-| Anything else (other distros, macOS, WSL1, Ubuntu ≤ 22.04) | Not supported — use an Ubuntu 24.04 VM/container |
+| Ubuntu 26.04 LTS, x86_64 | **Supported** (see [verified results](#test-results)); wkhtmltopdf is not packaged there |
+| Ubuntu 24.04 / 26.04 aarch64, Debian 12/13 | In the matrix but **untested** — refused unless `--allow-untested-platform` |
+| Anything else (other distros, macOS, WSL1, Ubuntu ≤ 22.04, interim releases such as 25.10) | Not supported — use an Ubuntu 24.04 or 26.04 VM/container |
 
 | Frappe branch | Python | Node.js | MariaDB | Redis | Source |
 |---------------|--------|---------|---------|-------|--------|
@@ -123,7 +124,7 @@ Resources: at least 2 GB RAM (4 GB RAM+swap recommended), 4 GB free disk for Fra
 
 ## Prerequisites
 
-- Ubuntu 24.04 with a **regular user that can use `sudo`** (do not run as root).
+- Ubuntu 24.04 or 26.04 (x86_64) with a **regular user that can use `sudo`** (do not run as root).
 - `python3` ≥ 3.10 (preinstalled on Ubuntu) and an internet connection (GitHub, PyPI, npm registry, nodejs.org, Ubuntu mirrors).
 - For `npx` / `npm install -g`: Node.js ≥ 18 with npm. For the git method: `git`.
 
@@ -171,10 +172,12 @@ Start the installation? [Y/n]:                       ⏎
 
 ## Choosing a Frappe version
 
-- **version-15** — mature stable release; works with Ubuntu 24.04's own Python 3.12, Node 18+ and MariaDB 10.11.
+- **version-15** — mature stable release; works with Ubuntu 24.04's own Python 3.12, Node 18+ and MariaDB 10.11,
+  and with Ubuntu 26.04's own Python 3.14 and MariaDB 11.8.
 - **version-16** — current stable release; needs Python 3.14, Node 24 and MariaDB 11.8. The installer gets
-  Python 3.14 via `uv` and Node 24 from nodejs.org **in your home directory**. On a machine without
-  MariaDB it uses the official MariaDB 11.8 repository (key fingerprint verified). If an **older MariaDB
+  Python 3.14 via `uv` and Node 24 from nodejs.org **in your home directory**. On Ubuntu 24.04 without
+  MariaDB it uses the official MariaDB 11.8 repository (key fingerprint verified). Ubuntu 26.04 already ships
+  Python 3.14 and MariaDB 11.8, so its own packages are used. If an **older MariaDB
   is already installed**, it stops and explains your options instead of upgrading your database server.
 - **develop** — unstable pre-release; may break at any time.
 
@@ -402,7 +405,7 @@ passwords. It never touches the host. Project layout: [docs/architecture.md](doc
 ### Test results
 
 <!-- TEST-RESULTS:START -->
-**Unit tests (executed):** 313 Python tests passed, 1 skipped (the opt-in network test); 17 npm launcher tests passed
+**Unit tests (executed):** 320 Python tests passed, 1 skipped (the opt-in network test); 17 npm launcher tests passed
 (`npm test`); `npm run test:pack` (tarball → global install + npx, isolated HOME) passed. ruff and mypy clean.
 
 **End-to-end (executed, 2026-10-23, clean Ubuntu 24.04.5 x86_64 Docker container, non-root sudo user):**
@@ -414,16 +417,25 @@ passwords. It never touches the host. Project layout: [docs/architecture.md](doc
 | version-15 (15.124.0) | frappe + ERPNext (version-15) — **via `npx`** from the packed npm tarball (only the tarball and Node.js 20.20.2 copied into the container, no git checkout) | Python 3.12.3 (Ubuntu), Node 20.20.2, MariaDB 10.11.14 (Ubuntu) | **PASS** — fresh install 6 min 33 s, ERPNext installed, ping OK, `status`/`doctor` via npx, rerun reused everything (27 s), no passwords in logs/state/npm cache/runtime venv |
 | version-15 (15.124.0) | frappe | Python 3.12.3 (Ubuntu), Node 20.20.2, MariaDB 10.11.14 (Ubuntu) | **PASS via `resume`** — the first run exposed a Yarn-detection bug (fixed + regression test); `resume` then completed, ping OK, rerun 20 s, `doctor` clean, no passwords leaked |
 
+**End-to-end (executed, 2026-10-23, clean Ubuntu 26.04.1 LTS x86_64 Docker container, non-root sudo user):**
+
+| Frappe | Apps | Runtimes used | Result |
+|--------|------|---------------|--------|
+| version-16 (16.53.0) | frappe | Python 3.14.4 (Ubuntu), Node 24.22.1, MariaDB 11.8.6 (Ubuntu — no external repo needed) | **PASS** — fresh install 8 min 48 s, ping OK, `status`/`doctor` OK, rerun reused everything (45 s), no passwords leaked |
+| version-15 (15.124.0) | frappe + ERPNext (version-15) | Python 3.14.4 (Ubuntu), Node 20.20.2, MariaDB 11.8.6 (Ubuntu) | **PASS** — fresh one-command install 15 min 21 s, ERPNext installed on the site, ping OK, rerun reused everything (40 s), no passwords leaked |
+
 **Also executed:** the interactive wizard through a real terminal (PTY) on a provisioned Ubuntu 24.04
 machine, up to the final confirmation (declined → nothing changed); `check` against live upstream branches.
 
-**Not yet verified:** a physical/VM Ubuntu with systemd, the `develop` branch, PostgreSQL, `--wkhtmltopdf`,
+**Not yet verified:** a physical/VM Ubuntu (24.04 or 26.04) with systemd, the npm launcher on 26.04, `--wkhtmltopdf` on 26.04 (not packaged there), the `develop` branch, PostgreSQL, `--wkhtmltopdf`,
 Debian/aarch64. See [docs/supported-platforms.md](docs/supported-platforms.md).
 <!-- TEST-RESULTS:END -->
 
 ## Known limitations
 
-- Only Ubuntu 24.04 x86_64 is tested. Other platforms are refused by default.
+- Only Ubuntu 24.04 and 26.04 x86_64 are tested. Other platforms are refused by default.
+- Ubuntu 26.04 no longer packages wkhtmltopdf: `--wkhtmltopdf` stops with instructions there (install the
+  patched-Qt build from https://github.com/wkhtmltopdf/packaging/releases yourself).
 - Development setups only — no production setup (nginx, supervisor, TLS).
 - PostgreSQL: experimental, Frappe-only, requires an existing server; not tested end-to-end.
 - An already-installed MariaDB older than the branch requires (e.g. 10.11 for v16) is not upgraded.
