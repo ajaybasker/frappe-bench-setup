@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
@@ -56,6 +57,7 @@ from .recovery import (
 )
 from .redaction import REDACTOR
 from .remote import FrappeMetadata, probe_frappe, resolve_ref
+from .services import bench_redis
 from .site_setup import (
     create_site,
     install_app,
@@ -662,6 +664,9 @@ class Installer:
             self.ui.warn(f"HTTP check did not pass: {result.detail}")
         return result.ok, result.detail, port
 
+    def bench_services(self) -> contextlib.AbstractContextManager[object]:
+        return bench_redis(self.bench, self.toolenv)
+
     # ------------------------------------------------------------------ main
     def run(self, *, preflight_done: bool = False) -> Outcome:
         if not preflight_done or self.report is None:
@@ -687,14 +692,17 @@ class Installer:
             self.run_database()
         with self.phase("bench"):
             self.run_bench()
-        with self.phase("apps"):
-            self.run_apps()
-        with self.phase("site"):
-            site_existed = self.run_site()
-        with self.phase("site_apps"):
-            apps = self.run_site_apps(site_existed)
-        with self.phase("configure"):
-            script = self.run_configure()
+        # The bench's own Redis (queue/cache) must be up while apps and sites are installed;
+        # it is stopped again before verification starts the full bench.
+        with self.bench_services():
+            with self.phase("apps"):
+                self.run_apps()
+            with self.phase("site"):
+                site_existed = self.run_site()
+            with self.phase("site_apps"):
+                apps = self.run_site_apps(site_existed)
+            with self.phase("configure"):
+                script = self.run_configure()
         with self.phase("verify"):
             http_ok, detail, port = self.run_verify(apps)
             if http_ok is False:

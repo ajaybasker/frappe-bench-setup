@@ -30,7 +30,8 @@ def _state_for(store: StateStore, bench: Path | None) -> RunState | None:
 
 
 def _log_finding(state: RunState | None) -> CheckItem | None:
-    if not state or not state.log_files:
+    # Only a failed/incomplete run's log is evidence of a problem.
+    if not state or not state.log_files or state.completed:
         return None
     path = Path(state.log_files[-1])
     if not path.is_file():

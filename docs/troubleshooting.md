@@ -34,6 +34,7 @@ Every error panel shows **Phase**, **Command**, **Exit code**, **Likely cause**,
 | `apps/<name> exists with a different remote` | An app with that name is already in the bench | frappe-setup won't overwrite it; rename/remove it yourself or use that repository |
 | `An incomplete bench from an earlier run is in the way` | Interrupted `bench init` | Interactive: choose *rename*; non-interactive: `--cleanup quarantine` |
 | `<path> already exists and is not a bench` | Target folder holds other files | Choose another bench name or parent directory |
+| `redis.exceptions.ConnectionError: Error 111 connecting to 127.0.0.1:11000` during a manual `bench … install-app` | The bench's own Redis only runs under `bench start` | Keep `bench start` running in another terminal while installing apps manually (frappe-setup starts the bench's Redis itself during installation) |
 | `HTTP check did not pass: port 8000 is already in use` | Another bench / process uses the port | Stop it (`ss -ltnp | grep 8000`) or change `webserver_port` |
 | `node: not found` / wrong Node when running `bench` later | New terminal without the env script | `source ~/.local/share/frappe-setup/env/<bench>-<id>.sh` (path in `status`) |
 | `Frappe prints an 'untested above 10.8' warning` (v15) | Frappe's own warning for MariaDB 10.11/11.x | Informational; the documented minimum (10.6.6) is met |

@@ -178,7 +178,8 @@ _RULES: list[tuple[str, Finding]] = [
         ),
     ),
     (
-        r"mysql_config not found|mariadb_config not found|libmariadb|pkg-config.*not found",
+        r"mysql_config not found|mariadb_config not found|"
+        r"libmariadb\S* (?:is )?not found|pkg-config: (?:command )?not found",
         Finding(
             "mariadb_dev_headers",
             "MariaDB client development headers are missing (needed to build mysqlclient).",
@@ -192,6 +193,16 @@ _RULES: list[tuple[str, Finding]] = [
             "build_tools",
             "C build tools or Python headers are missing.",
             "Install `build-essential` and `python3-dev`.",
+            True,
+        ),
+    ),
+    (
+        r"Error 111 connecting to 127\.0\.0\.1:(?:11000|12000|13000)|redis\.exceptions\.ConnectionError",
+        Finding(
+            "bench_redis_down",
+            "The bench's own Redis (queue/cache) is not running.",
+            "frappe-setup starts it during installation; for manual bench commands keep `bench start` "
+            "running in another terminal, then retry.",
             True,
         ),
     ),

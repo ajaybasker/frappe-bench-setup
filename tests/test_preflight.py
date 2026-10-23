@@ -199,3 +199,20 @@ def test_tool_probe_uses_extended_path(tmp_path) -> None:
         os.chmod(f, 0o700)
     info = probe_tool(Runner(), "yarn", ["yarn", "--version"], tool_search_path([node_dir, yarn_dir]))
     assert info.version == "1.22.22"
+
+
+def test_unknown_service_state_is_not_reported_as_stopped(matrix) -> None:
+    """Regression (seen in a container without systemd): unknown != not running."""
+    from frappe_setup.compatibility import INFO
+
+    report = report_for(matrix, make_facts(services={"mariadb": "unknown"}))
+    assert status(report, "MariaDB service") == INFO
+    report = report_for(matrix, make_facts(services={"mariadb": "inactive"}))
+    assert status(report, "MariaDB service") == MISSING
+
+
+def test_package_names_in_successful_logs_are_not_diagnosed_as_errors() -> None:
+    from frappe_setup.diagnosis import diagnose
+
+    assert diagnose("Setting up libmariadb-dev:amd64 (1:10.11.14)") is None
+    assert diagnose("OSError: mysql_config not found").key == "mariadb_dev_headers"

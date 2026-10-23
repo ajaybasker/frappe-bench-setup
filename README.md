@@ -219,7 +219,7 @@ cd ~/frappe-projects/frappe-bench
 | Command | What it does |
 |---------|--------------|
 | `bench get-app --branch version-15 https://github.com/frappe/hrms` | Download an app into the bench |
-| `bench --site dev.localhost install-app hrms` | Install it on a site |
+| `bench --site dev.localhost install-app hrms` | Install it on a site (keep `bench start` running in another terminal: apps such as ERPNext need the bench's Redis) |
 | `bench --site dev.localhost uninstall-app hrms` | Remove it from a site (deletes its data) |
 | `bench update` | Pull all apps, migrate all sites, rebuild — do this deliberately, after a backup |
 
@@ -322,7 +322,20 @@ passwords. It never touches the host. Project layout: [docs/architecture.md](doc
 ### Test results
 
 <!-- TEST-RESULTS:START -->
-_Pending: end-to-end results are added here only from real runs._
+**Unit tests (executed):** 304 passed, 1 skipped (the opt-in network test). ruff and mypy clean.
+
+**End-to-end (executed, 2026-10-23, clean Ubuntu 24.04.5 x86_64 Docker container, non-root sudo user):**
+
+| Frappe | Apps | Runtimes used | Result |
+|--------|------|---------------|--------|
+| version-16 (16.53.0) | frappe | Python 3.14.9 (uv), Node 24.22.1, MariaDB 11.8.9 (official repo) | **PASS** — fresh install 6 min 17 s, site answered `/api/method/ping`, rerun reused everything (15 s), no passwords in logs/state/output |
+| version-15 (15.124.0) | frappe | Python 3.12.3 (Ubuntu), Node 20.20.2, MariaDB 10.11.14 (Ubuntu) | **PASS via `resume`** — the first run exposed a Yarn-detection bug (fixed + regression test); `resume` then completed, ping OK, rerun 20 s, `doctor` clean, no passwords leaked |
+
+**Also executed:** the interactive wizard through a real terminal (PTY) on a provisioned Ubuntu 24.04
+machine, up to the final confirmation (declined → nothing changed); `check` against live upstream branches.
+
+**Not yet verified:** a physical/VM Ubuntu with systemd, the `develop` branch, PostgreSQL, `--wkhtmltopdf`,
+Debian/aarch64. See [docs/supported-platforms.md](docs/supported-platforms.md).
 <!-- TEST-RESULTS:END -->
 
 ## Known limitations

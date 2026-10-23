@@ -159,5 +159,33 @@ branches:
     needs_wkhtmltopdf: false
     erpnext_branch: develop
 
-# Filled only from real end-to-end runs (tests/integration). Empty means "not verified".
-tested: []
+# Filled only from real end-to-end runs (tests/integration/run_e2e.sh). Empty means "not verified".
+tested:
+  - platform: ubuntu-24.04.5-x86_64 (Docker, non-root sudo user, no systemd)
+    frappe_branch: version-16
+    frappe_version: 16.53.0
+    frappe_commit: e8d41dd006
+    date: "2026-10-23"
+    python: "3.14.9 (uv-managed)"
+    node: "24.22.1 (nodejs.org, managed)"
+    yarn: "1.22.22"
+    mariadb: "11.8.9 (deb.mariadb.org)"
+    redis: "7.0.15 (Ubuntu)"
+    bench_cli: "5.31.0"
+    apps: [frappe]
+    result: "pass: fresh install 377s, /api/method/ping=pong, rerun idempotent (15s), no secrets in logs/state/output"
+  - platform: ubuntu-24.04.5-x86_64 (Docker, non-root sudo user, no systemd)
+    frappe_branch: version-15
+    frappe_version: 15.124.0
+    frappe_commit: f1cf50cf9b
+    date: "2026-10-23"
+    python: "3.12.3 (Ubuntu system)"
+    node: "20.20.2 (nodejs.org, managed)"
+    yarn: "1.22.22"
+    mariadb: "10.11.14 (Ubuntu)"
+    redis: "7.0.15 (Ubuntu)"
+    bench_cli: "5.31.0"
+    apps: [frappe]
+    result: >-
+      pass via `frappe-setup resume` after the first run failed on a Yarn-detection bug (fixed, regression
+      test added): /api/method/ping=pong, rerun idempotent (20s), doctor clean, no secrets in logs/state/output

@@ -444,17 +444,30 @@ def evaluate(
         )
         state = facts.services.get("mariadb", "unknown")
         if installed is not None:
-            add(
-                CheckItem(
-                    "MariaDB service",
-                    OK if state == "active" else (WARN if state == "unknown" else MISSING),
-                    found=state,
-                    required="active",
-                    message="" if state == "active" else "The MariaDB service is not running.",
-                    remedy="Started with systemctl/service (requires sudo).",
-                    fixable=state != "active",
+            if state == "active":
+                add(CheckItem("MariaDB service", OK, found=state, required="active"))
+            elif state == "unknown":
+                add(
+                    CheckItem(
+                        "MariaDB service",
+                        INFO,
+                        found="unknown (no systemd)",
+                        required="active",
+                        message="Service state cannot be read without systemd; connectivity is checked later.",
+                    )
                 )
-            )
+            else:
+                add(
+                    CheckItem(
+                        "MariaDB service",
+                        MISSING,
+                        found=state,
+                        required="active",
+                        message="The MariaDB service is not running.",
+                        remedy="Started with systemctl/service (requires sudo).",
+                        fixable=True,
+                    )
+                )
     else:
         psql = facts.tool("psql")
         add(
