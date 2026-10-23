@@ -152,19 +152,21 @@ def evaluate(
     add = items.append
 
     # ---------------------------------------------------------------- platform
-    status = matrix.platform_status(facts.os_id, facts.os_version, facts.arch)
+    platform = matrix.platform(facts.os_id, facts.os_version, facts.arch)
+    status = platform.status if platform else "unsupported"
     os_text = f"{facts.os_pretty} ({facts.arch})"
+    supported = matrix.supported_platforms_text()
     if status == "supported":
-        add(CheckItem("Operating system", OK, found=os_text, required="Ubuntu 24.04 x86_64"))
+        add(CheckItem("Operating system", OK, found=os_text, required=supported))
     elif status == "untested":
         add(
             CheckItem(
                 "Operating system",
                 WARN if allow_untested_platform else FAIL,
                 found=os_text,
-                required="Ubuntu 24.04 x86_64 (tested)",
+                required=f"{supported} (tested)",
                 message="This platform is in the matrix but has not been tested by this project.",
-                remedy="Use Ubuntu 24.04 x86_64, or pass --allow-untested-platform to proceed at your own risk.",
+                remedy=f"Use {supported}, or pass --allow-untested-platform to proceed at your own risk.",
             )
         )
     else:
@@ -173,9 +175,9 @@ def evaluate(
                 "Operating system",
                 FAIL,
                 found=os_text,
-                required="Ubuntu 24.04 x86_64",
+                required=supported,
                 message="This operating system / architecture is not supported.",
-                remedy="Use Ubuntu 24.04 x86_64 (a VM or container is fine), or the official frappe_docker images.",
+                remedy=f"Use {supported} (a VM or container is fine), or the official frappe_docker images.",
             )
         )
     if facts.arch == "x86_64" and facts.cpu_flags:
@@ -503,15 +505,32 @@ def evaluate(
     # ---------------------------------------------------------------- optional
     if branch.needs_wkhtmltopdf:
         wk = facts.tool("wkhtmltopdf")
+        packaged = not (platform and "wkhtmltopdf" in platform.unavailable_packages)
+        manual = (
+            "install the patched-Qt build from https://github.com/wkhtmltopdf/packaging/releases yourself "
+            f"({platform.label if platform else 'this release'} no longer packages wkhtmltopdf)"
+        )
+        if wk.found:
+            wk_status = OK
+        elif want_wkhtmltopdf:
+            wk_status = MISSING if packaged else FAIL
+        else:
+            wk_status = WARN
         add(
             CheckItem(
                 "wkhtmltopdf",
-                OK if wk.found else (MISSING if want_wkhtmltopdf else WARN),
+                wk_status,
                 found=wk.version or "not found",
                 required="optional (PDF printing)",
                 message="" if wk.found else "PDF generation will not work until wkhtmltopdf is installed.",
-                remedy="apt: wkhtmltopdf (Ubuntu build without patched Qt).",
-                fixable=want_wkhtmltopdf,
+                remedy=(
+                    "apt: wkhtmltopdf (Ubuntu build without patched Qt)."
+                    if packaged
+                    else f"Drop --wkhtmltopdf, or {manual}."
+                    if want_wkhtmltopdf
+                    else f"Optional: {manual}."
+                ),
+                fixable=want_wkhtmltopdf and packaged,
             )
         )
 

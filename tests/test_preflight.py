@@ -64,7 +64,10 @@ def test_missing_mariadb_is_installable(matrix) -> None:
     "os_id,version,arch,expected",
     [
         ("ubuntu", "24.04", "x86_64", OK),
+        ("ubuntu", "26.04", "x86_64", OK),
         ("ubuntu", "24.04", "aarch64", FAIL),
+        ("ubuntu", "26.04", "aarch64", FAIL),
+        ("ubuntu", "25.10", "x86_64", FAIL),
         ("debian", "12", "x86_64", FAIL),
         ("ubuntu", "20.04", "x86_64", FAIL),
         ("fedora", "40", "x86_64", FAIL),
@@ -76,6 +79,50 @@ def test_platforms(matrix, os_id, version, arch, expected) -> None:
     assert status(report, "Operating system") == expected
     if expected == FAIL:
         assert report.item("Operating system") in report.blocking
+
+
+def resolute(**overrides):
+    """A provisioned Ubuntu 26.04 machine: Python 3.14, MariaDB 11.8, Redis 8, no wkhtmltopdf."""
+    facts = make_facts(
+        os_version="26.04",
+        os_codename="resolute",
+        os_pretty="Ubuntu 26.04.1 LTS",
+        tools={"wkhtmltopdf": None, "mariadb": "11.8.6", "mariadbd": "11.8.6", "redis-server": "8.0.5"},
+        **overrides,
+    )
+    facts.pythons = [Interpreter("/usr/bin/python3.14", "3.14.3", "system")]
+    facts.nodes = [NodeRuntime("/usr/bin", "24.15.0", "path")]
+    return facts
+
+
+@pytest.mark.parametrize("branch", ["version-15", "version-16"])
+def test_ubuntu_26_04_is_ready_with_its_own_packages(matrix, branch) -> None:
+    report = report_for(matrix, resolute(), branch)
+    assert status(report, "Operating system") == OK
+    assert not report.blocking, [i.name for i in report.blocking]
+    assert report.python and report.python.version == "3.14.3"
+
+
+def test_os_messages_name_every_supported_release(matrix) -> None:
+    assert matrix.supported_platforms_text() == "Ubuntu 24.04 / 26.04 x86_64"
+    report = report_for(matrix, make_facts(os_version="22.04"))
+    item = report.item("Operating system")
+    assert item.required == "Ubuntu 24.04 / 26.04 x86_64"
+    assert "26.04" in item.remedy
+
+
+def test_wkhtmltopdf_on_ubuntu_26_04_is_not_offered_from_apt(matrix) -> None:
+    # Not requested: only a warning that points at the manual download.
+    item = report_for(matrix, resolute()).item("wkhtmltopdf")
+    assert item.status == WARN and "no longer packages" in item.remedy and "apt:" not in item.remedy
+    # Requested: blocking instead of an apt install that cannot succeed.
+    report = report_for(matrix, resolute(), want_wkhtmltopdf=True)
+    item = report.item("wkhtmltopdf")
+    assert item.status == FAIL and not item.fixable and item in report.blocking
+    assert "--wkhtmltopdf" in item.remedy
+    # On 24.04 it is still an apt package.
+    report = report_for(matrix, make_facts(tools={"wkhtmltopdf": None}), want_wkhtmltopdf=True)
+    assert report.item("wkhtmltopdf").status == MISSING and report.item("wkhtmltopdf").fixable
 
 
 def test_untested_platform_override(matrix) -> None:

@@ -131,6 +131,11 @@ class PlatformSpec:
     codename: str
     architectures: list[str]
     status: str
+    unavailable_packages: list[str] = field(default_factory=list)
+
+    @property
+    def label(self) -> str:
+        return f"{'Ubuntu' if self.id == 'ubuntu' else self.id.capitalize()} {self.version}"
 
 
 @dataclass
@@ -171,11 +176,28 @@ class Matrix:
     def branch(self, name: str) -> BranchSpec | None:
         return self.branches.get(name)
 
-    def platform_status(self, os_id: str, version: str, arch: str) -> str:
+    def platform(self, os_id: str, version: str, arch: str) -> PlatformSpec | None:
         for p in self.platforms:
             if p.id == os_id and p.version == version and arch in p.architectures:
-                return p.status
-        return "unsupported"
+                return p
+        return None
+
+    def platform_status(self, os_id: str, version: str, arch: str) -> str:
+        p = self.platform(os_id, version, arch)
+        return p.status if p else "unsupported"
+
+    def supported_platforms_text(self) -> str:
+        """'Ubuntu 24.04 / 26.04 x86_64' — built from the entries marked supported."""
+        groups: dict[tuple[str, str], list[str]] = {}
+        for p in self.platforms:
+            if p.status != "supported":
+                continue
+            name = p.label.rsplit(" ", 1)[0]
+            for arch in p.architectures:
+                versions = groups.setdefault((name, arch), [])
+                if p.version not in versions:
+                    versions.append(p.version)
+        return ", ".join(f"{name} {' / '.join(v)} {arch}" for (name, arch), v in groups.items()) or "none"
 
     def tested_for(self, branch: str) -> list[dict[str, Any]]:
         return [t for t in self.tested if t.get("frappe_branch") == branch]
@@ -227,6 +249,7 @@ def _load_matrix_cached(path_text: str) -> Matrix:
                 codename=p.get("codename", ""),
                 architectures=list(p.get("architectures") or []),
                 status=p.get("status", "untested"),
+                unavailable_packages=list(p.get("unavailable_packages") or []),
             )
         )
     return matrix

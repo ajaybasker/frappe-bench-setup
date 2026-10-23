@@ -35,6 +35,19 @@ platforms:
     codename: noble
     architectures: [aarch64]
     status: untested
+  - id: ubuntu
+    version: "26.04"
+    codename: resolute
+    architectures: [x86_64]
+    status: supported
+    # Ships Python 3.14, MariaDB 11.8 and Redis 8.0; wkhtmltopdf is no longer packaged.
+    unavailable_packages: [wkhtmltopdf]
+  - id: ubuntu
+    version: "26.04"
+    codename: resolute
+    architectures: [aarch64]
+    status: untested
+    unavailable_packages: [wkhtmltopdf]
   - id: debian
     version: "12"
     codename: bookworm

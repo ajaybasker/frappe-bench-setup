@@ -1,7 +1,8 @@
-# Disposable "clean Ubuntu 24.04" used by tests/integration/run_e2e.sh.
+# Disposable "clean Ubuntu" (24.04 by default, 26.04 with UBUNTU=26.04) used by tests/integration/run_e2e.sh.
 # Mirrors a fresh server/desktop: python3 present, a regular user with sudo,
 # nothing Frappe-related installed. git and ca-certificates stand in for "the user cloned the repo".
-FROM ubuntu:24.04
+ARG UBUNTU=24.04
+FROM ubuntu:${UBUNTU}
 
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
@@ -26,7 +27,7 @@ RUN if [ -n "$NODE_VERSION" ]; then \
         && rm /tmp/node.tgz && node --version && npm --version; \
     fi
 
-# Ubuntu 24.04 images ship a default 'ubuntu' user (uid 1000); use a dedicated one.
+# Ubuntu 24.04+ images ship a default 'ubuntu' user (uid 1000); use a dedicated one.
 RUN useradd --create-home --shell /bin/bash dev \
     && echo 'dev ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/dev \
     && chmod 0440 /etc/sudoers.d/dev

@@ -5,6 +5,7 @@
 #   e.g. tests/integration/run_e2e.sh version-15
 #        tests/integration/run_e2e.sh version-16 --erpnext
 #        E2E_VIA=npx tests/integration/run_e2e.sh version-15   # via `npx` from the npm tarball
+#        E2E_UBUNTU=26.04 tests/integration/run_e2e.sh version-16  # on Ubuntu 26.04 (default 24.04)
 #
 # E2E_VIA=repo (default): copy the repository into the container and run ./install.sh.
 # E2E_VIA=npx: `npm pack` on the host, copy only the tarball, run `npx --package <tgz> frappe-setup-cli`.
@@ -22,10 +23,11 @@ BRANCH="${1:?usage: run_e2e.sh <frappe-branch> [install args...]}"
 shift || true
 EXTRA_ARGS=("$@")
 REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
-IMAGE="frappe-setup-e2e:ubuntu-24.04"
+UBUNTU="${E2E_UBUNTU:-24.04}"
+IMAGE="frappe-setup-e2e:ubuntu-${UBUNTU}"
 VIA="${E2E_VIA:-repo}"
 [[ "${VIA}" == "repo" || "${VIA}" == "npx" ]] || { echo "E2E_VIA must be repo or npx" >&2; exit 2; }
-NAME="frappe-setup-e2e-${VIA}-${BRANCH}-$(date +%s)"
+NAME="frappe-setup-e2e-${VIA}-u${UBUNTU}-${BRANCH}-$(date +%s)"
 ART="${REPO}/tests/integration/.artifacts/${NAME}"
 mkdir -p "${ART}"
 
@@ -35,7 +37,7 @@ if [[ "${VIA}" == "npx" ]]; then
     NODE_ARG="${E2E_NODE_VERSION:-20.20.2}"
     TARBALL="$(cd "${REPO}" && npm pack --pack-destination "${ART}" --silent)"
 fi
-docker build -q --build-arg "APT_MIRROR=${E2E_APT_MIRROR:-}" --build-arg "NODE_VERSION=${NODE_ARG}" \
+docker build -q --build-arg "UBUNTU=${UBUNTU}" --build-arg "APT_MIRROR=${E2E_APT_MIRROR:-}" --build-arg "NODE_VERSION=${NODE_ARG}" \
     -t "${IMAGE}" "${REPO}/tests/integration" >/dev/null
 
 cleanup() {
@@ -92,4 +94,4 @@ if grep -rlF -e "${ADMIN_PW}" -e "${DB_PW}" "${ART}"; then echo "FAIL: secret in
 echo "no secrets found in logs, state, reports or console output" | tee -a "${ART}/summary.txt"
 
 docker exec "${NAME}" bash -c 'du -sh ~/frappe-projects/frappe-bench ~/.local/share/frappe-setup ~/.local/share/uv 2>/dev/null; df -h / | tail -1' 2>&1 | tee -a "${ART}/summary.txt"
-echo "PASS (${VIA}): ${BRANCH} ${EXTRA_ARGS[*]:-}" | tee -a "${ART}/summary.txt"
+echo "PASS (${VIA}, Ubuntu ${UBUNTU}): ${BRANCH} ${EXTRA_ARGS[*]:-}" | tee -a "${ART}/summary.txt"
