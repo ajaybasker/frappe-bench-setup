@@ -38,7 +38,7 @@ def test_help_lists_commands() -> None:
 
 def test_version() -> None:
     result = runner.invoke(cli.app, ["--version"])
-    assert result.exit_code == 0 and "frappe-setup 1.0.0" in result.output
+    assert result.exit_code == 0 and "frappe-setup 1.0.1" in result.output
 
 
 def test_install_help_has_no_password_flags() -> None:
