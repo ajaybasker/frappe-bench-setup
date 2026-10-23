@@ -43,6 +43,7 @@ Every error panel shows **Phase**, **Command**, **Exit code**, **Likely cause**,
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
+| `npm error 404 Not Found - GET https://registry.npmjs.org/frappe-setup-cli` | The package has not been published to npm yet | Use `./install.sh` from a git checkout, or `npm pack` and `npx --package ./frappe-setup-cli-1.0.0.tgz frappe-setup-cli` |
 | `x Frappe Setup CLI runs on Linux only` | macOS / Windows | Use an Ubuntu 24.04 VM or container (WSL2 is Linux but untested) |
 | `x Python 3.10+ was not found on PATH` | No usable `python3` | `sudo apt install python3 python3-venv` |
 | `x Node.js 18+ is required` | Old Node.js running npx | Upgrade Node.js (nodejs.org or nvm) — the bench's own Node.js is handled separately |

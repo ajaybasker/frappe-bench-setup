@@ -28,6 +28,14 @@ bench start
 >
 > Both start the same installer and accept the same commands and options
 > (`./install.sh check` = `npx frappe-setup-cli check`, and so on).
+>
+> Before publication, `npx frappe-setup-cli` fails with `npm error 404 Not Found`, because the registry
+> has no such package yet. To try the npm launcher from a checkout without publishing it:
+>
+> ```bash
+> npm pack                                                     # creates frappe-setup-cli-1.0.0.tgz
+> npx --package ./frappe-setup-cli-1.0.0.tgz frappe-setup-cli  # same as `npx frappe-setup-cli`
+> ```
 
 ### Three ways to run it
 
