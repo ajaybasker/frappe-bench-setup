@@ -202,3 +202,14 @@ tested:
     result: >-
       pass via `frappe-setup resume` after the first run failed on a Yarn-detection bug (fixed, regression
       test added): /api/method/ping=pong, rerun idempotent (20s), doctor clean, no secrets in logs/state/output
+  - platform: ubuntu-24.04.5-x86_64 (Docker, non-root sudo user, no systemd)
+    launcher: "npx --package frappe-setup-cli-1.0.0.tgz frappe-setup-cli (npm tarball only, no git checkout)"
+    frappe_branch: version-15
+    frappe_version: 15.124.0
+    frappe_commit: f1cf50cf9b
+    date: "2026-10-23"
+    python: "3.12.3 (Ubuntu system)"
+    node: "20.20.2 (nodejs.org, preinstalled for npx and reused)"
+    mariadb: "10.11.14 (Ubuntu)"
+    apps: [frappe, erpnext version-15]
+    result: "pass: fresh install 393s, /api/method/ping=pong, status/doctor via npx, rerun idempotent (27s), no secrets in logs/state/npm cache"

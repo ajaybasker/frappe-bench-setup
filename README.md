@@ -402,7 +402,8 @@ passwords. It never touches the host. Project layout: [docs/architecture.md](doc
 ### Test results
 
 <!-- TEST-RESULTS:START -->
-**Unit tests (executed):** 308 passed, 1 skipped (the opt-in network test). ruff and mypy clean.
+**Unit tests (executed):** 313 Python tests passed, 1 skipped (the opt-in network test); 17 npm launcher tests passed
+(`npm test`); `npm run test:pack` (tarball → global install + npx, isolated HOME) passed. ruff and mypy clean.
 
 **End-to-end (executed, 2026-10-23, clean Ubuntu 24.04.5 x86_64 Docker container, non-root sudo user):**
 
@@ -410,6 +411,7 @@ passwords. It never touches the host. Project layout: [docs/architecture.md](doc
 |--------|------|---------------|--------|
 | version-16 (16.53.0) | frappe | Python 3.14.9 (uv), Node 24.22.1, MariaDB 11.8.9 (official repo) | **PASS** — fresh install 6 min 17 s, site answered `/api/method/ping`, rerun reused everything (15 s), no passwords in logs/state/output |
 | version-15 (15.124.0) | frappe + **ERPNext 15.124.1** | Python 3.12.3 (Ubuntu), Node 20.20.2, MariaDB 10.11.14 (Ubuntu) | **PASS** — fresh one-command install 6 min 7 s, ERPNext installed on the site, ping OK, rerun reused everything (19 s), no passwords leaked |
+| version-15 (15.124.0) | frappe + ERPNext (version-15) — **via `npx`** from the packed npm tarball (only the tarball and Node.js 20.20.2 copied into the container, no git checkout) | Python 3.12.3 (Ubuntu), Node 20.20.2, MariaDB 10.11.14 (Ubuntu) | **PASS** — fresh install 6 min 33 s, ERPNext installed, ping OK, `status`/`doctor` via npx, rerun reused everything (27 s), no passwords in logs/state/npm cache/runtime venv |
 | version-15 (15.124.0) | frappe | Python 3.12.3 (Ubuntu), Node 20.20.2, MariaDB 10.11.14 (Ubuntu) | **PASS via `resume`** — the first run exposed a Yarn-detection bug (fixed + regression test); `resume` then completed, ping OK, rerun 20 s, `doctor` clean, no passwords leaked |
 
 **Also executed:** the interactive wizard through a real terminal (PTY) on a provisioned Ubuntu 24.04
