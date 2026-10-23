@@ -24,6 +24,7 @@ systemd, starting from only `python3`, `git`, `sudo`, `ca-certificates`. Recorde
 | 2026-10-23 | version-16 (16.53.0) | frappe | 3.14.9 (uv) | 24.22.1 (managed) | 11.8.9 (MariaDB repo) | PASS — fresh install 377 s, ping = pong, rerun idempotent 15 s, no secrets leaked |
 | 2026-10-23 | version-15 (15.124.0) | frappe, erpnext 15.124.1 | 3.12.3 (Ubuntu) | 20.20.2 (managed) | 10.11.14 (Ubuntu) | PASS — fresh one-command install 367 s, ping = pong, rerun 19 s, no secrets leaked |
 | 2026-10-23 | **Ubuntu 26.04.1** · version-16 (16.53.0) | frappe | 3.14.4 (Ubuntu) | 24.22.1 (managed) | 11.8.6 (Ubuntu) | PASS — fresh install 528 s, ping = pong, rerun idempotent 45 s, no secrets leaked |
+| 2026-10-23 | **Ubuntu 26.04.1** · version-16 (16.53.0) | education (+ erpnext added automatically as its required app) | 3.14.4 (Ubuntu) | 24.22.1 (managed) | 11.8.6 (Ubuntu) | PASS — fresh install 461 s, both apps installed on the site, ping = pong, rerun 26 s, no secrets leaked |
 | 2026-10-23 | **Ubuntu 26.04.1** · version-15 (15.124.0) | frappe, erpnext (version-15) | 3.14.4 (Ubuntu) | 20.20.2 (managed) | 11.8.6 (Ubuntu) | PASS — fresh one-command install 921 s, ping = pong, rerun 40 s, no secrets leaked |
 | 2026-10-23 | version-15 (15.124.0) | frappe | 3.12.3 (Ubuntu) | 20.20.2 (managed) | 10.11.14 (Ubuntu) | PASS via `resume` after a first-run bug (fixed); ping = pong, rerun 20 s, doctor clean, no secrets leaked |
 

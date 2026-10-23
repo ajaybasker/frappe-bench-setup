@@ -290,6 +290,7 @@ class Installer:
                 catalog=load_catalog(),
                 existing_apps=existing,
             )
+            self.config.apps = [a.spec for a in self.apps]
             for app in self.apps:
                 deps = f" (requires {', '.join(app.meta.required_apps)})" if app.meta.required_apps else ""
                 self.ui.success(f"{app.name}: {app.meta.ref} @ {app.meta.sha[:10]}{deps}")

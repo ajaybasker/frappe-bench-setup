@@ -214,8 +214,26 @@ Before anything long-running, each app is checked:
 - the branch exists (default: same name as the Frappe branch, e.g. `version-15`; if the app has no such
   branch you are asked to pick one — nothing is guessed);
 - the app's declared Frappe range (`[tool.bench.frappe-dependencies]`) matches your Frappe version;
-- its `required_apps` are selected too (e.g. HRMS → ERPNext, Helpdesk → Telephony, LMS → Payments);
+- its `required_apps` (read from the app's `hooks.py`) are selected too — e.g. Education → ERPNext,
+  HRMS → ERPNext, Helpdesk → Telephony, LMS → Payments. Chains are followed (a required app's own
+  requirements are checked too) and apps already in the bench count as present;
 - install order is sorted so dependencies come first.
+
+When something does not fit, the wizard **asks instead of stopping**:
+
+| Situation | Interactive wizard | `--non-interactive` |
+|-----------|--------------------|---------------------|
+| An app needs an official app you did not select (Education → ERPNext) | `Add ERPNext (erpnext) … and install it before education? [Y/n]` | Stops before any change: `add --app erpnext … or rerun with --yes`; with `--yes` it is added automatically |
+| An app needs an app that is not in the catalog | Uses the repository named in `hooks.py` (`org/repo` → GitHub) and asks; otherwise asks for its Git URL | Stops with `--app-url <Git URL of …>`; unknown repositories are never guessed |
+| The branch you typed does not exist | Shows the repository's branches to pick from (or type another) | Stops and lists the available branches |
+| The app has no branch named like your Frappe branch | Asks which branch to use | Stops: pass `--app NAME@BRANCH` |
+| The app's branch declares another Frappe version | Offers another branch, or skip | Stops and explains |
+| The repository cannot be reached / does not exist | Try again · enter a different URL · skip · cancel | Stops with the git error |
+| A MariaDB-only app (ERPNext, HRMS, Education) on PostgreSQL | Skip it · cancel | Stops and explains |
+| You decline a required app | Skip only the app that needs it · cancel | — |
+
+All of this happens before anything is installed. Answers like `maybe` are rejected and asked again,
+and at "Add custom apps by Git URL as well?" you can paste the URL directly.
 
 Custom apps: give an `https://` or SSH URL and a branch/tag. Private repos work with an SSH key or a git
 credential helper; URLs with embedded tokens are refused (they'd end up in `.git/config` and logs).
@@ -405,7 +423,7 @@ passwords. It never touches the host. Project layout: [docs/architecture.md](doc
 ### Test results
 
 <!-- TEST-RESULTS:START -->
-**Unit tests (executed):** 320 Python tests passed, 1 skipped (the opt-in network test); 17 npm launcher tests passed
+**Unit tests (executed):** 345 Python tests passed, 1 skipped (the opt-in network test); 17 npm launcher tests passed
 (`npm test`); `npm run test:pack` (tarball → global install + npx, isolated HOME) passed. ruff and mypy clean.
 
 **End-to-end (executed, 2026-10-23, clean Ubuntu 24.04.5 x86_64 Docker container, non-root sudo user):**
@@ -422,6 +440,7 @@ passwords. It never touches the host. Project layout: [docs/architecture.md](doc
 | Frappe | Apps | Runtimes used | Result |
 |--------|------|---------------|--------|
 | version-16 (16.53.0) | frappe | Python 3.14.4 (Ubuntu), Node 24.22.1, MariaDB 11.8.6 (Ubuntu — no external repo needed) | **PASS** — fresh install 8 min 48 s, ping OK, `status`/`doctor` OK, rerun reused everything (45 s), no passwords leaked |
+| version-16 (16.53.0) | only `--app education` selected → **ERPNext added automatically** as its required app (`--yes`), installed before Education | Python 3.14.4 (Ubuntu), Node 24.22.1, MariaDB 11.8.6 (Ubuntu) | **PASS** — fresh install 7 min 41 s, erpnext and education installed on the site, ping OK, rerun reused everything (26 s), no passwords leaked |
 | version-15 (15.124.0) | frappe + ERPNext (version-15) | Python 3.14.4 (Ubuntu), Node 20.20.2, MariaDB 11.8.6 (Ubuntu) | **PASS** — fresh one-command install 15 min 21 s, ERPNext installed on the site, ping OK, rerun reused everything (40 s), no passwords leaked |
 
 **Also executed:** the interactive wizard through a real terminal (PTY) on a provisioned Ubuntu 24.04

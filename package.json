@@ -40,7 +40,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "test": "node --test tests/npm/",
+    "test": "node --test tests/npm/*.test.js",
     "test:pack": "bash tests/npm/pack-smoke.sh"
   }
 }

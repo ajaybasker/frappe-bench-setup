@@ -137,9 +137,11 @@ class UI:
             lines.append(f"[bold]Command:[/]     {exc.command}")
         if exc.exit_code is not None:
             lines.append(f"[bold]Exit code:[/]   {exc.exit_code}")
-        lines.append(
-            f"[bold]Likely cause:[/] {escape(localize(exc.cause or 'Unknown — see the log for the full output.'))}"
-        )
+        if exc.cause or exc.command:
+            # Only a failed command has an unknown cause; the tool's own checks state theirs.
+            lines.append(
+                f"[bold]Likely cause:[/] {escape(localize(exc.cause or 'Unknown — see the log for the full output.'))}"
+            )
         if exc.remedy:
             lines.append(f"[bold]Fix:[/]         {escape(localize(exc.remedy))}")
         if exc.retry_safe is not None:
@@ -209,6 +211,7 @@ class UI:
                 return True
             if value in ("n", "no"):
                 return False
+            self.error("Please answer y (yes) or n (no).")
 
     def choose(self, prompt: str, options: Sequence[tuple[str, str]], default: str | None = None) -> str:
         """options: (value, label). Returns the chosen value."""

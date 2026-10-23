@@ -57,6 +57,9 @@ class AppMetadata:
     required_apps: list[str] = field(default_factory=list)
     frappe_dependencies: dict[str, str] = field(default_factory=dict)
     requires_python: str | None = None
+    # Where a required app can be fetched from, when hooks.py names its repository
+    # ('org/repo' or a URL), the way `bench get-app` resolves it: {app name: URL}.
+    required_app_sources: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -224,6 +227,16 @@ def required_app_name(entry: str) -> str:
     return entry.rsplit("/", 1)[-1].replace("-", "_")
 
 
+def required_app_source(entry: str) -> str | None:
+    """'frappe/erpnext' -> 'https://github.com/frappe/erpnext'; a URL stays a URL; 'erpnext' -> None."""
+    entry = entry.strip().rstrip("/")
+    if "://" in entry or entry.startswith("git@"):
+        return entry
+    if re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", entry):
+        return f"https://github.com/{entry.removesuffix('.git')}"
+    return None
+
+
 def _setup_py_name(text: str | None) -> str | None:
     if not text:
         return None
@@ -290,6 +303,9 @@ def probe_app(runner: Runner, url: str, ref: RefInfo, *, phase: str = "resolve")
         name=name,
         title=_hooks_title(hooks),
         required_apps=[required_app_name(x) for x in parse_required_apps(hooks)],
+        required_app_sources={
+            required_app_name(x): src for x in parse_required_apps(hooks) if (src := required_app_source(x))
+        },
         frappe_dependencies={str(k).replace("-", "_"): str(v) for k, v in deps.items()},
         requires_python=str(project.get("requires-python"))
         if isinstance(project, dict) and project.get("requires-python")

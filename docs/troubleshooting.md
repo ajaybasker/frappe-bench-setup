@@ -31,7 +31,7 @@ Every error panel shows **Phase**, **Command**, **Exit code**, **Likely cause**,
 | `No space left on device` | Disk full | Free space or choose another parent directory; resume |
 | `has no 'version-16' branch; choose one explicitly` | App does not publish that branch | Pick a branch: `--app crm@main` |
 | `declares frappe >=15…,<16, but version-16 is frappe 16.x` | App branch doesn't match the framework | Use the app branch matching your Frappe branch |
-| `requires the app 'telephony', which is not selected` | Missing `required_apps` | Add the required app (it is installed first automatically) |
+| `requires the app 'erpnext', which is not selected` (non-interactive) | The app's `required_apps` are not in your app list | Add the flag shown (e.g. `--app erpnext`), or rerun with `--yes` to add official required apps automatically; the interactive wizard asks instead |
 | `apps/<name> exists with a different remote` | An app with that name is already in the bench | frappe-setup won't overwrite it; rename/remove it yourself or use that repository |
 | `An incomplete bench from an earlier run is in the way` | Interrupted `bench init` | Interactive: choose *rename*; non-interactive: `--cleanup quarantine` |
 | `<path> already exists and is not a bench` | Target folder holds other files | Choose another bench name or parent directory |

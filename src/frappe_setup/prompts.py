@@ -249,12 +249,30 @@ def ask_apps(ui: UI, presets: Presets, frappe_branch: str, db_engine: str) -> li
             "[dim]Branches are resolved from each repository; apps without a "
             f"{frappe_branch} branch will ask which branch to use.[/]"
         )
-    if mode in ("custom", "official") and (
-        mode == "custom" or ui.confirm("Add custom apps by Git URL as well?", default=False)
-    ):
-        ui.info("Enter custom apps in installation order (dependencies first). Leave the URL empty to finish.")
+    first_url = ""
+    wants_custom = mode == "custom"
+    if mode == "official":
         while True:
-            url = ui.ask("Git repository URL (https:// or SSH)", "")
+            answer = ui.ask("Add custom apps by Git URL as well? (y/N, or paste the URL)", "n").strip()
+            if answer.lower() in ("y", "yes", "true"):
+                wants_custom = True
+            elif answer.lower() in ("", "n", "no", "false"):
+                wants_custom = False
+            else:
+                try:
+                    v.validate_git_url(answer)
+                except ValidationError as exc:
+                    ui.error(f"{exc} Answer y, n, or paste a Git URL.")
+                    continue
+                wants_custom, first_url = True, answer
+            break
+    if wants_custom:
+        ui.info(
+            "Enter custom apps; apps they require are detected and offered automatically. "
+            "Leave the URL empty to finish."
+        )
+        while True:
+            url, first_url = first_url or ui.ask("Git repository URL (https:// or SSH)", ""), ""
             if not url:
                 break
             try:

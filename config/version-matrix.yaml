@@ -250,3 +250,16 @@ tested:
     bench_cli: "5.31.0"
     apps: [frappe, erpnext version-15]
     result: "pass: one-command fresh install 921s, /api/method/ping=pong, rerun idempotent (40s), no secrets in logs/state/output"
+  - platform: ubuntu-26.04.1-x86_64 (Docker, non-root sudo user, no systemd)
+    frappe_branch: version-16
+    frappe_version: 16.53.0
+    frappe_commit: e8d41dd006
+    date: "2026-10-23"
+    python: "3.14.4 (Ubuntu system)"
+    node: "24.22.1 (nodejs.org, managed)"
+    mariadb: "11.8.6 (Ubuntu)"
+    apps: [frappe, erpnext version-16, education version-16]
+    result: >-
+      pass: only `--app education` requested; erpnext added automatically as its required app (--yes) and
+      installed first; fresh install 461s, both apps on the site, /api/method/ping=pong, rerun idempotent (26s),
+      no secrets in logs/state/output

@@ -10,10 +10,10 @@ from .commands import Runner, command_error
 from .compatibility import parse_version, satisfies, spec
 from .config import AppSpec
 from .dependencies import ToolEnv
-from .errors import SetupError
+from .errors import SetupError, UserAbort
 from .remote import AppMetadata, list_refs, probe_app
 from .ui import UI
-from .validation import normalize_url, validate_branch
+from .validation import normalize_url, repo_basename, validate_branch, validate_git_url
 
 PHASE_RESOLVE = "resolve"
 PHASE = "apps"
@@ -46,36 +46,60 @@ def notable_branches(refs: dict[str, dict[str, str]], limit: int = 10) -> list[s
     return (first + versions + rest)[:limit]
 
 
+OTHER_REF = "__other__"
+
+
+def _ask_branch(
+    ui: UI, app: AppSpec, refs: dict[str, dict[str, str]], frappe_branch: str, exclude: tuple[str, ...] = ()
+) -> str:
+    """Let the user pick a branch from the repository (or type any existing branch/tag)."""
+    notable = [b for b in notable_branches(refs, limit=20) if b not in exclude]
+    if not notable and not refs["tag"]:
+        raise SetupError(f"{app.url} has no branches or tags.", phase=PHASE_RESOLVE, retry_safe=False)
+    preferred = [b for b in notable if b in (frappe_branch, "main", "master", "develop")]
+    options = [(b, b) for b in notable] + [(OTHER_REF, "Another branch or tag (type its name)")]
+    choice = ui.choose(
+        f"Branch for {app.key}", options, default=preferred[0] if preferred else (notable or [OTHER_REF])[0]
+    )
+    while choice == OTHER_REF:
+        typed = ui.ask(f"Branch or tag of {app.key}", validate=validate_branch)
+        if typed in refs["branch"] or typed in refs["tag"]:
+            return typed
+        ui.error(f"{typed!r} does not exist in {app.url}.")
+    return choice
+
+
 def choose_branch(ui: UI, app: AppSpec, refs: dict[str, dict[str, str]], frappe_branch: str) -> str:
     """Pick the app branch. Explicit values are verified; nothing is substituted silently."""
     if app.branch:
         validate_branch(app.branch)
-        if app.branch not in refs["branch"] and app.branch not in refs["tag"]:
+        if app.branch in refs["branch"] or app.branch in refs["tag"]:
+            return app.branch
+        if not ui.interactive:
             raise SetupError(
                 f"Branch or tag {app.branch!r} does not exist in {app.url}.",
                 phase=PHASE_RESOLVE,
                 remedy="Available branches include: " + ", ".join(notable_branches(refs)),
                 retry_safe=False,
             )
-        return app.branch
+        ui.warn(f"{app.key}: branch or tag {app.branch!r} does not exist in {app.url}. Choose the branch to use:")
+        return _ask_branch(ui, app, refs, frappe_branch)
     same = default_branch_for(refs, frappe_branch)
     if same:
         return same
     notable = notable_branches(refs, limit=20)
-    preferred = [b for b in notable if b in ("main", "master", "develop")]
     if not ui.interactive:
         raise SetupError(
             f"{app.url} has no {frappe_branch!r} branch; choose one explicitly.",
             phase=PHASE_RESOLVE,
             remedy=(
                 f"Pass the branch, e.g. {'--app ' + app.key if app.source == 'catalog' else '--app-url ' + app.url}"
-                f"@{notable[0]} (available include: {', '.join(notable[:10])})."
+                f"@{notable[0] if notable else '<branch>'} (available include: {', '.join(notable[:10])})."
             ),
             retry_safe=False,
         )
     ui.warn(f"{app.key}: no {frappe_branch!r} branch. Choose the branch to use:")
-    options = [(b, b) for b in notable]
-    return ui.choose(f"Branch for {app.key}", options, default=preferred[0] if preferred else notable[0])
+    return _ask_branch(ui, app, refs, frappe_branch)
 
 
 def _check_framework_constraint(meta: AppMetadata, frappe_version: str | None, frappe_branch: str) -> str | None:
@@ -128,6 +152,138 @@ def topo_order(apps: list[ResolvedApp], available: set[str]) -> list[ResolvedApp
     return ordered
 
 
+RETRY, NEW_URL, OTHER_BRANCH, SKIP, CANCEL = "retry", "url", "branch", "skip", "cancel"
+
+
+def _norm(name: str) -> str:
+    return name.strip().lower().replace("-", "_")
+
+
+def _recover(ui: UI, label: str, problem: str, options: list[tuple[str, str]]) -> str:
+    """Interactive: explain the problem and let the user fix it instead of aborting the run."""
+    ui.error(problem)
+    choices = [
+        *options,
+        (SKIP, f"Skip {label} (do not install it)"),
+        (CANCEL, "Cancel the installation"),
+    ]
+    choice = ui.choose(f"How do you want to continue with {label}?", choices, default=choices[0][0])
+    if choice == CANCEL:
+        raise UserAbort(f"Installation cancelled while resolving {label}.")
+    return choice
+
+
+def _ask_url(ui: UI, prompt: str, default: str | None = None) -> str:
+    return ui.ask(prompt, default if default is not None else "", validate=lambda s: validate_git_url(s) if s else s)
+
+
+def _resolve_one(
+    runner: Runner,
+    ui: UI,
+    app: AppSpec,
+    *,
+    frappe_branch: str,
+    frappe_version: str | None,
+    db_engine: str,
+    catalog_by_url: dict[str, dict[str, object]],
+) -> tuple[ResolvedApp | None, list[str]]:
+    """Resolve one app. Interactive problems become questions; otherwise they are returned."""
+    from .remote import RefInfo
+
+    tried: list[str] = []
+    while True:
+        try:
+            refs = list_refs(runner, app.url, phase=PHASE_RESOLVE)
+        except SetupError as exc:
+            if not ui.interactive:
+                raise
+            why = f"{exc.message}. {exc.cause or ''}".strip()
+            choice = _recover(ui, app.key, why, [(RETRY, "Try again"), (NEW_URL, "Enter a different Git URL")])
+            if choice == SKIP:
+                return None, []
+            if choice == NEW_URL:
+                app.url = _ask_url(ui, f"Git URL for {app.key}", app.url) or app.url
+            continue
+        app.branch = choose_branch(ui, app, refs, frappe_branch)
+        kind = "branch" if app.branch in refs["branch"] else "tag"
+        ref = RefInfo(app.url, app.branch, kind, refs[kind][app.branch])
+        try:
+            meta = probe_app(runner, app.url, ref, phase=PHASE_RESOLVE)
+        except SetupError as exc:
+            if not ui.interactive:
+                raise
+            why = f"{exc.message} {exc.cause or ''}".strip()
+            choice = _recover(
+                ui,
+                app.key,
+                why,
+                [(OTHER_BRANCH, "Choose another branch"), (NEW_URL, "Enter a different Git URL"), (RETRY, "Try again")],
+            )
+            if choice == SKIP:
+                return None, []
+            if choice == NEW_URL:
+                app.url = _ask_url(ui, f"Git URL for {app.key}", app.url) or app.url
+            if choice == OTHER_BRANCH:
+                tried.append(app.branch)
+                app.branch = _ask_branch(ui, app, refs, frappe_branch, exclude=tuple(tried))
+            continue
+
+        problems: list[str] = []
+        if app.name and _norm(app.name) != meta.name:
+            problems.append(f"{app.url} declares app name {meta.name!r}, not {app.name!r}.")
+        entry = catalog_by_url.get(normalize_url(app.url))
+        if db_engine == "postgres" and entry and entry.get("mariadb_only"):
+            if ui.interactive:
+                _recover(ui, meta.name, f"{meta.name} supports MariaDB only, but this site uses PostgreSQL.", [])
+                return None, []
+            problems.append(f"{meta.name} supports MariaDB only; choose MariaDB or drop this app.")
+        mismatch = _check_framework_constraint(meta, frappe_version, frappe_branch)
+        if mismatch and ui.interactive:
+            choice = _recover(ui, meta.name, mismatch, [(OTHER_BRANCH, "Choose another branch of this app")])
+            if choice == SKIP:
+                return None, []
+            tried.append(app.branch)
+            app.branch = _ask_branch(ui, app, refs, frappe_branch, exclude=tuple(tried))
+            continue
+        if mismatch:
+            problems.append(mismatch)
+        app.name = meta.name
+        return ResolvedApp(app, meta), problems
+
+
+def _dependency_spec(
+    ui: UI, dependent: ResolvedApp, dep: str, catalog_by_key: dict[str, dict[str, object]]
+) -> tuple[AppSpec | None, str | None]:
+    """An app that `dependent` requires but that is not selected: offer to add it.
+
+    Returns (spec to add, None), or (None, problem) when it cannot or may not be added.
+    """
+    entry = catalog_by_key.get(dep)
+    url = str(entry["repository"]) if entry else dependent.meta.required_app_sources.get(dep)
+    title = f"{entry['title']} ({dep})" if entry else dep
+    source = "catalog" if entry else "custom"
+    if not ui.interactive:
+        if url and ui.assume_yes:
+            ui.info(f"{dependent.name} requires {title}; adding it from {url} (--yes).")
+            return AppSpec(key=dep, url=url, source=source), None
+        flag = f"--app {dep}" if entry else f"--app-url {url or '<Git URL of ' + dep + '>'}"
+        hint = " or rerun with --yes to add it automatically" if url else ""
+        return None, (
+            f"{dependent.name} requires the app {dep!r}, which is not selected: add {flag} "
+            f"(it is installed before {dependent.name}){hint}."
+        )
+    ui.warn(f"{dependent.name} requires the app {title}, which is not selected.")
+    if url:
+        if ui.confirm(f"Add {title} from {url} and install it before {dependent.name}?", default=True):
+            return AppSpec(key=dep, url=url, source=source), None
+        return None, None
+    ui.info(f"{dep} is not one of the official apps known to this tool; enter its Git repository URL.")
+    typed = _ask_url(ui, f"Git URL for {dep} (empty = do not add it)")
+    if typed:
+        return AppSpec(key=repo_basename(typed) or dep, url=typed, source="custom"), None
+    return None, None
+
+
 def resolve_apps(
     runner: Runner,
     ui: UI,
@@ -140,42 +296,75 @@ def resolve_apps(
     existing_apps: set[str] | None = None,
     on_progress: object | None = None,
 ) -> list[ResolvedApp]:
-    existing_apps = existing_apps or set()
+    """Resolve every app and its required apps, in install order.
+
+    Interactive runs ask how to continue on each problem (add a required app, pick another
+    branch or URL, skip the app) instead of aborting; non-interactive runs report every
+    problem at once before anything is installed.
+    """
+    available = {_norm(a) for a in (existing_apps or set())}
+    catalog_by_url = {normalize_url(str(c["repository"])): c for c in catalog}
+    catalog_by_key = {_norm(str(c["key"])): c for c in catalog}
+    queue = list(apps)
     resolved: list[ResolvedApp] = []
     problems: list[str] = []
-    catalog_by_url = {normalize_url(str(c["repository"])): c for c in catalog}
-    for app in apps:
-        refs = list_refs(runner, app.url, phase=PHASE_RESOLVE)
-        app.branch = choose_branch(ui, app, refs, frappe_branch)
-        kind = "branch" if app.branch in refs["branch"] else "tag"
-        from .remote import RefInfo
 
-        ref = RefInfo(app.url, app.branch, kind, refs[kind][app.branch])
-        meta = probe_app(runner, app.url, ref, phase=PHASE_RESOLVE)
-        if app.name and app.name != meta.name:
-            problems.append(f"{app.url} declares app name {meta.name!r}, not {app.name!r}.")
-        app.name = meta.name
-        entry = catalog_by_url.get(normalize_url(app.url))
-        if db_engine == "postgres" and entry and entry.get("mariadb_only"):
-            problems.append(f"{meta.name} supports MariaDB only; choose MariaDB or drop this app.")
-        problem = _check_framework_constraint(meta, frappe_version, frappe_branch)
-        if problem:
-            problems.append(problem)
-        resolved.append(ResolvedApp(app, meta))
-    names = [r.name for r in resolved]
-    dupes = {n for n in names if names.count(n) > 1}
-    if dupes:
-        problems.append(f"More than one repository provides app(s): {', '.join(sorted(dupes))}.")
+    def selected(dep: str) -> bool:
+        return any(r.name == dep for r in resolved) or any(_norm(a.name or a.key) == dep for a in queue)
+
+    while queue:
+        spec_ = queue.pop(0)
+        app, found = _resolve_one(
+            runner,
+            ui,
+            spec_,
+            frappe_branch=frappe_branch,
+            frappe_version=frappe_version,
+            db_engine=db_engine,
+            catalog_by_url=catalog_by_url,
+        )
+        problems += found
+        if app is None:
+            ui.warn(f"{spec_.key} will not be installed.")
+            continue
+        twin = next((r for r in resolved if r.name == app.name), None)
+        if twin is not None:
+            if normalize_url(twin.spec.url) == normalize_url(app.spec.url):
+                continue  # selected twice (e.g. as a dependency and by hand)
+            msg = f"Both {twin.spec.url} and {app.spec.url} provide the app {app.name!r}."
+            if ui.interactive:
+                ui.warn(msg + f" Keeping {twin.spec.url}.")
+                continue
+            problems.append(msg)
+            continue
+        resolved.append(app)
+        for dep in app.meta.required_apps:
+            dep = _norm(dep)
+            if dep == "frappe" or dep in available or selected(dep):
+                continue
+            added, problem = _dependency_spec(ui, app, dep, catalog_by_key)
+            if added is not None:
+                queue.insert(0, added)  # resolved next; topo_order installs it first
+                continue
+            if problem:
+                problems.append(problem)
+                continue
+            # Interactive and declined: the app cannot work without it.
+            _recover(ui, app.name, f"{app.name} cannot be installed without {dep}.", [])
+            resolved.remove(app)
+            ui.warn(f"{app.name} will not be installed.")
+            break
+
     if problems:
         raise SetupError(
-            "The selected applications are not compatible with this setup.",
+            "The selected applications cannot be installed as requested. Nothing was changed.",
             phase=PHASE_RESOLVE,
             cause="; ".join(problems),
-            remedy="Pick app branches that match the Frappe branch (e.g. the same version-NN branch).",
+            remedy="Fix the items above (or run interactively to be asked about each one), then rerun.",
             retry_safe=False,
             details=problems,
         )
-    return topo_order(resolved, available=existing_apps)
+    return topo_order(resolved, available=available)
 
 
 # ===================================================================== fetching
