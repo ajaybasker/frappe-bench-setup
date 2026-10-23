@@ -5,6 +5,7 @@ Nothing in this module changes the system.
 
 from __future__ import annotations
 
+import contextlib
 import glob
 import json
 import os
@@ -213,7 +214,10 @@ def probe_tool(runner: Runner, name: str, argv: list[str], search_path: str) -> 
     exe = shutil.which(argv[0], path=search_path)
     if exe is None:
         return ToolInfo(name)
-    result = runner.run([exe, *argv[1:]], timeout=PROBE_TIMEOUT, quiet=True, phase="detect")
+    # Probe with the same PATH the tool was found on: launchers such as yarn or npm use
+    # `#!/usr/bin/env node`, which must resolve to the Node.js selected for the bench.
+    env = dict(os.environ, PATH=search_path)
+    result = runner.run([exe, *argv[1:]], env=env, timeout=PROBE_TIMEOUT, quiet=True, phase="detect")
     text = result.output.strip()
     if name == "crontab":  # `crontab -V` is not supported everywhere; presence is enough
         return ToolInfo(name, exe, "present", text[:200])
@@ -328,10 +332,8 @@ def inspect_bench(path: Path, runner: Runner | None = None) -> BenchInfo | None:
     if apps_txt.is_file():
         info.apps = [a.strip() for a in apps_txt.read_text(encoding="utf-8").splitlines() if a.strip()]
     sites_dir = path / "sites"
-    try:
+    with contextlib.suppress(OSError):
         info.sites = sorted(p.name for p in sites_dir.iterdir() if (p / "site_config.json").is_file())
-    except OSError:
-        pass
     head = path / "apps" / "frappe" / ".git" / "HEAD"
     try:
         text = head.read_text(encoding="utf-8").strip()

@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Local configuration and secrets (never commit these)
+*.local.yaml
+local-config.yaml
+*.secret
+*.password
+secrets/
+.env
+.env.*
+
+# Logs and state produced by running the tool from the repository
+*.log
+logs/
+
+# Integration test artifacts
+tests/integration/.artifacts/
+
+# Editors / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store

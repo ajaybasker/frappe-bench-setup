@@ -186,7 +186,7 @@ def _data_file(name: str) -> Path:
     repo_copy = Path(__file__).resolve().parents[2] / "config" / name
     if repo_copy.is_file():
         return repo_copy
-    packaged = resources.files("frappe_setup").joinpath("data", name)
+    packaged = resources.files("frappe_setup").joinpath("data").joinpath(name)
     return Path(str(packaged))
 
 

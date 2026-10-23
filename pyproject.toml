@@ -60,7 +60,7 @@ markers = [
 ]
 
 [tool.ruff]
-line-length = 100
+line-length = 120
 target-version = "py310"
 src = ["src", "tests"]
 
@@ -69,11 +69,13 @@ select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF"]
 ignore = [
     "S603",  # subprocess without shell: all calls use argv lists by design
     "S607",  # partial executable paths: tools are resolved from PATH deliberately
+    "SIM102",  # nested ifs are kept where they read better
+    "S101",  # asserts are used for type narrowing of internal invariants only
     "RUF001", "RUF003",  # box-drawing characters in UI strings
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "S105", "S106", "S108"]
+"tests/**" = ["S101", "S105", "S106", "S108", "E501"]
 
 [tool.mypy]
 python_version = "3.10"

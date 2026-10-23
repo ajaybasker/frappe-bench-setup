@@ -16,6 +16,7 @@ import sys
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from .commands import Runner, command_error
 from .errors import SetupError
@@ -70,13 +71,12 @@ class FrappeMetadata:
 def list_refs(runner: Runner, url: str, *, phase: str = "resolve") -> dict[str, dict[str, str]]:
     """{'branch': {name: sha}, 'tag': {name: sha}} for a repository."""
     validate_git_url(url)
-    result = runner.run(
+    result = runner.capture(
         ["git", "ls-remote", "--heads", "--tags", "--", url],
         env=git_env(),
         timeout=GIT_TIMEOUT,
         retries=GIT_RETRIES,
         phase=phase,
-        quiet=True,
     )
     if not result.ok:
         raise command_error(result, phase=phase, message=f"Cannot list branches of {url}")
@@ -105,15 +105,16 @@ def resolve_ref(runner: Runner, url: str, ref: str, *, phase: str = "resolve") -
         return RefInfo(url, ref, "branch", refs["branch"][ref])
     if ref in refs["tag"]:
         return RefInfo(url, ref, "tag", refs["tag"][ref])
-    similar = sorted(
-        b for b in refs["branch"] if b.startswith(("version-", "develop", "main", "master"))
-    )
+    from .app_setup import notable_branches
+
+    similar = notable_branches(refs)
     raise SetupError(
         f"Branch or tag {ref!r} does not exist in {url}.",
         phase=phase,
         cause="The requested ref was not found by `git ls-remote`.",
-        remedy=("Available branches include: " + ", ".join(similar[:12])) if similar else
-        "Check the branch name with `git ls-remote --heads --tags <url>`.",
+        remedy=("Available branches include: " + ", ".join(similar))
+        if similar
+        else "Check the branch name with `git ls-remote --heads --tags <url>`.",
         retry_safe=False,
     )
 
@@ -133,8 +134,19 @@ class RepoSnapshot:
         self._dir = Path(tempfile.mkdtemp(prefix="repo-", dir=base))
         result = self.runner.run(
             [
-                "git", "clone", "--quiet", "--depth", "1", "--filter=blob:none", "--no-checkout",
-                "--single-branch", "--branch", self.ref, "--", self.url, str(self._dir / "r"),
+                "git",
+                "clone",
+                "--quiet",
+                "--depth",
+                "1",
+                "--filter=blob:none",
+                "--no-checkout",
+                "--single-branch",
+                "--branch",
+                self.ref,
+                "--",
+                self.url,
+                str(self._dir / "r"),
             ],
             env=git_env(),
             timeout=GIT_TIMEOUT,
@@ -144,9 +156,7 @@ class RepoSnapshot:
         )
         if not result.ok:
             self.__exit__(None, None, None)
-            raise command_error(
-                result, phase=self.phase, message=f"Cannot read {self.url} at {self.ref}"
-            )
+            raise command_error(result, phase=self.phase, message=f"Cannot read {self.url} at {self.ref}")
         return self
 
     def __exit__(self, *exc: object) -> None:
@@ -160,25 +170,23 @@ class RepoSnapshot:
         return self._dir / "r"
 
     def read(self, file: str) -> str | None:
-        result = self.runner.run(
+        """Exact file content at HEAD (fetches the single blob lazily), or None if absent."""
+        result = self.runner.capture(
             ["git", "-C", str(self.path), "show", f"HEAD:{file}"],
             env=git_env(),
             timeout=GIT_TIMEOUT,
             retries=GIT_RETRIES,
             phase=self.phase,
-            quiet=True,
         )
         return result.output if result.ok else None
 
     def head(self) -> str:
-        result = self.runner.run(
-            ["git", "-C", str(self.path), "rev-parse", "HEAD"], timeout=30, phase=self.phase, quiet=True
-        )
+        result = self.runner.capture(["git", "-C", str(self.path), "rev-parse", "HEAD"], timeout=30, phase=self.phase)
         return result.output.strip() if result.ok else ""
 
 
 # ------------------------------------------------------------------- parsers
-def parse_pyproject(text: str | None) -> dict[str, object]:
+def parse_pyproject(text: str | None) -> dict[str, Any]:
     if not text:
         return {}
     try:
@@ -236,7 +244,7 @@ def probe_frappe(runner: Runner, url: str, ref: RefInfo, *, phase: str = "resolv
         pyproject = parse_pyproject(snap.read("pyproject.toml"))
         package_json_text = snap.read("package.json")
         init_py = snap.read("frappe/__init__.py") or ""
-    requires_python = (pyproject.get("project") or {}).get("requires-python")  # type: ignore[union-attr]
+    requires_python = (pyproject.get("project") or {}).get("requires-python")
     node_engine = None
     if package_json_text:
         try:
@@ -257,7 +265,7 @@ def probe_app(runner: Runner, url: str, ref: RefInfo, *, phase: str = "resolve")
     with RepoSnapshot(runner, url, ref.ref, phase=phase) as snap:
         pyproject = parse_pyproject(snap.read("pyproject.toml"))
         project = pyproject.get("project") or {}
-        name = project.get("name") if isinstance(project, dict) else None  # type: ignore[assignment]
+        name = project.get("name") if isinstance(project, dict) else None
         if not name:
             name = _setup_py_name(snap.read("setup.py"))
         if not name:
@@ -273,7 +281,7 @@ def probe_app(runner: Runner, url: str, ref: RefInfo, *, phase: str = "resolve")
                 retry_safe=False,
             )
     validate_app_name(name)
-    bench_tool = ((pyproject.get("tool") or {}).get("bench") or {})  # type: ignore[union-attr]
+    bench_tool = (pyproject.get("tool") or {}).get("bench") or {}
     deps = bench_tool.get("frappe-dependencies") or {}
     return AppMetadata(
         url=url,
@@ -283,5 +291,7 @@ def probe_app(runner: Runner, url: str, ref: RefInfo, *, phase: str = "resolve")
         title=_hooks_title(hooks),
         required_apps=[required_app_name(x) for x in parse_required_apps(hooks)],
         frappe_dependencies={str(k).replace("-", "_"): str(v) for k, v in deps.items()},
-        requires_python=str(project.get("requires-python")) if isinstance(project, dict) and project.get("requires-python") else None,
+        requires_python=str(project.get("requires-python"))
+        if isinstance(project, dict) and project.get("requires-python")
+        else None,
     )

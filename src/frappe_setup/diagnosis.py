@@ -49,6 +49,17 @@ _RULES: list[tuple[str, Finding]] = [
         ),
     ),
     (
+        r"Unable to fetch some archives|Failed to fetch http://",
+        Finding(
+            "apt_fetch",
+            "APT could not download some packages (mirror unreachable, or the network blocks plain-HTTP downloads).",
+            "Retry later. If the same file keeps failing, switch APT to an HTTPS mirror in "
+            "/etc/apt/sources.list.d/ubuntu.sources (e.g. URIs: https://mirrors.edge.kernel.org/ubuntu/), "
+            "run `sudo apt-get update`, then `frappe-setup resume`.",
+            True,
+        ),
+    ),
+    (
         r"dpkg was interrupted",
         Finding(
             "dpkg_interrupted",
@@ -189,8 +200,7 @@ _RULES: list[tuple[str, Finding]] = [
         Finding(
             "port_in_use",
             "A required network port is already in use (perhaps by another bench).",
-            "Stop the other process (`ss -ltnp`) or change the bench ports in "
-            "sites/common_site_config.json.",
+            "Stop the other process (`ss -ltnp`) or change the bench ports in sites/common_site_config.json.",
             True,
         ),
     ),
@@ -199,8 +209,7 @@ _RULES: list[tuple[str, Finding]] = [
         Finding(
             "sudo",
             "Administrative privileges are not available non-interactively.",
-            "Run the installer interactively so sudo can ask for your password, or use an "
-            "account with sudo rights.",
+            "Run the installer interactively so sudo can ask for your password, or use an account with sudo rights.",
             True,
         ),
     ),

@@ -37,8 +37,10 @@ _PATTERNS: list[tuple[re.Pattern[str], str]] = [
         rf"\g<key>\g<q>{MASK}\g<q>",
     ),
     # SQL: IDENTIFIED BY 'x' / PASSWORD('x') / USING PASSWORD('x')
-    (re.compile(r"(IDENTIFIED\s+BY\s+)'(?:[^'\\]|\\.)*'", re.IGNORECASE), rf"\1'{MASK}'"),
-    (re.compile(r"(PASSWORD\s*\(\s*)'(?:[^'\\]|\\.)*'", re.IGNORECASE), rf"\1'{MASK}'"),
+    (re.compile(r"(IDENTIFIED\s+BY\s+)'(?:[^'\\]|\\.|'')*'", re.IGNORECASE), rf"\1'{MASK}'"),
+    (re.compile(r"(PASSWORD\s*\(\s*)'(?:[^'\\]|\\.|'')*'", re.IGNORECASE), rf"\1'{MASK}'"),
+    # SHOW CREATE USER output: ... USING '*HASH' (password hashes are sensitive too)
+    (re.compile(r"(\bUSING\s+)'(?!invalid')(?:[^'\\]|\\.)+'", re.IGNORECASE), rf"\1'{MASK}'"),
 ]
 
 

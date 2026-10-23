@@ -126,9 +126,7 @@ def validate_git_url(url: str) -> str:
 
     parts = urlsplit(url)
     if parts.scheme not in {"https", "ssh"}:
-        raise ValidationError(
-            "Only https:// or SSH (git@host:owner/repo.git, ssh://...) repository URLs are allowed."
-        )
+        raise ValidationError("Only https:// or SSH (git@host:owner/repo.git, ssh://...) repository URLs are allowed.")
     if not parts.hostname:
         raise ValidationError(f"Repository URL {url!r} has no host.")
     if parts.password or (parts.scheme == "https" and parts.username):
@@ -147,10 +145,7 @@ def repo_basename(url: str) -> str:
     """Last path component without .git (a hint only; the real app name comes from the repo)."""
     path = url.rstrip("/")
     scp = SSH_SCP_RE.match(path)
-    if scp:
-        path = scp.group("path")
-    else:
-        path = urlsplit(path).path
+    path = scp.group("path") if scp else urlsplit(path).path
     name = path.rstrip("/").rsplit("/", 1)[-1]
     return name[:-4] if name.endswith(".git") else name
 
@@ -188,9 +183,7 @@ def validate_parent_dir(value: str, *, home: Path | None = None) -> Path:
     text = str(path)
     for root in _FORBIDDEN_ROOTS:
         if text == root or (root != "/" and text.startswith(root + "/") and not _inside(path, home)):
-            raise ValidationError(
-                f"{path} is a system location. Choose a directory you own, e.g. ~/frappe-projects."
-            )
+            raise ValidationError(f"{path} is a system location. Choose a directory you own, e.g. ~/frappe-projects.")
     if path.exists() and not path.is_dir():
         raise ValidationError(f"{path} exists and is not a directory.")
     # The nearest existing ancestor must be writable by the current user.

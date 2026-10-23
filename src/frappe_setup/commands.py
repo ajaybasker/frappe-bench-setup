@@ -9,6 +9,7 @@ Rules enforced here:
 
 from __future__ import annotations
 
+import contextlib
 import errno
 import os
 import re
@@ -125,15 +126,82 @@ class Runner:
             return
         deadline = time.monotonic() + 10
         while time.monotonic() < deadline:
+            # Reap the leader: an unreaped zombie keeps the group "alive" for killpg(pid, 0).
+            if self._current is not None:
+                self._current.poll()
             try:
                 os.killpg(pid, 0)
             except (ProcessLookupError, PermissionError):
                 return
             time.sleep(0.2)
-        try:
+        with contextlib.suppress(ProcessLookupError, PermissionError):
             os.killpg(pid, signal.SIGKILL)
-        except (ProcessLookupError, PermissionError):
-            pass
+
+    def run_on_terminal(self, argv: Sequence[str], *, phase: str = "", timeout: float | None = 300) -> int:
+        """Run attached to the user's terminal (used only for `sudo -v` password prompts)."""
+        argv = [str(a) for a in argv]
+        get_logger(phase).info("$ %s   (terminal)", REDACTOR.redact_argv(argv))
+        if self.dry_run:
+            return 0
+        try:
+            return subprocess.run(argv, timeout=timeout, check=False).returncode
+        except FileNotFoundError:
+            return 127
+        except subprocess.TimeoutExpired:
+            return 124
+
+    def capture(
+        self,
+        argv: Sequence[str],
+        *,
+        phase: str = "",
+        cwd: Path | str | None = None,
+        env: Mapping[str, str] | None = None,
+        timeout: float = 120,
+        retries: int = 0,
+    ) -> CommandResult:
+        """Run a short command and return its *complete, exact* stdout (stderr kept separately).
+
+        Used where the output is data (git ls-remote, git show <file>), so it must not be
+        truncated or reformatted like the streamed output of `run()`.
+        """
+        argv = [str(a) for a in argv]
+        log = get_logger(phase)
+        attempt = 0
+        while True:
+            log.info("$ %s   (capture)", REDACTOR.redact_argv(argv))
+            if self.dry_run:
+                return CommandResult(argv, 0, "")
+            start = time.monotonic()
+            try:
+                proc = subprocess.run(
+                    argv,
+                    cwd=str(cwd) if cwd else None,
+                    env=self._env(env, None),
+                    stdin=subprocess.DEVNULL,
+                    capture_output=True,
+                    timeout=timeout,
+                    check=False,
+                )
+                result = CommandResult(
+                    argv,
+                    proc.returncode,
+                    proc.stdout.decode("utf-8", errors="replace"),
+                    stderr=proc.stderr.decode("utf-8", errors="replace"),
+                    duration=time.monotonic() - start,
+                )
+            except FileNotFoundError:
+                result = CommandResult(argv, 127, "", stderr=f"{argv[0]}: command not found")
+            except subprocess.TimeoutExpired:
+                result = CommandResult(argv, 124, "", stderr="timed out", timed_out=True)
+            log.info("exit %s after %.1fs (%d bytes)", result.returncode, result.duration, len(result.output))
+            if not result.ok:
+                for line in result.stderr.splitlines()[-20:]:
+                    log.debug("| %s", line)
+            if result.ok or attempt >= retries or not looks_like_network_error(result.stderr):
+                return result
+            attempt += 1
+            time.sleep(min(2**attempt, 20))
 
     # --------------------------------------------------------------------- run
     def run(
@@ -243,7 +311,7 @@ class Runner:
         logger.info("exit %s after %.1fs%s", rc, duration, " (timeout)" if timed_out else "")  # type: ignore[attr-defined]
         return CommandResult(argv, rc, "\n".join(tail), duration=duration, timed_out=timed_out)
 
-    def _pump(self, stream, proc, tail, logger, on_line, timeout, start, quiet) -> bool:  # type: ignore[no-untyped-def]
+    def _pump(self, stream, proc, tail, logger, on_line, timeout, start, quiet) -> bool:
         sel = selectors.DefaultSelector()
         sel.register(stream, selectors.EVENT_READ)
         buffer = b""
@@ -270,7 +338,7 @@ class Runner:
         return False
 
     @staticmethod
-    def _emit_lines(buffer: bytes, tail, logger, on_line, quiet) -> bytes:  # type: ignore[no-untyped-def]
+    def _emit_lines(buffer: bytes, tail, logger, on_line, quiet) -> bytes:
         parts = re.split(rb"\r\n|\n|\r", buffer)
         rest = parts.pop()
         for raw in parts:
@@ -339,7 +407,7 @@ class Runner:
                 stdout=slave,
                 stderr=slave,
                 start_new_session=True,
-                preexec_fn=_make_controlling_tty,  # noqa: PLW1509
+                preexec_fn=_make_controlling_tty,
             )
         except FileNotFoundError:
             os.close(master)
@@ -414,10 +482,8 @@ class Runner:
             raise
         finally:
             self._current = self._current_pid = None
-            try:
+            with contextlib.suppress(OSError):
                 os.close(master)
-            except OSError:
-                pass
         if pending.strip():
             tail.append(pending.strip())
         rc = proc.returncode
@@ -442,8 +508,10 @@ def command_error(
     """Build a SetupError from a failed command, enriched by the diagnosis knowledge base."""
     from .diagnosis import diagnose
 
-    finding = diagnose(result.output)
+    text = "\n".join(part for part in (result.output, result.stderr) if part)
+    finding = diagnose(text)
     log = current_log_file()
+    cause: str | None
     if result.timed_out:
         cause = "The command did not finish within its time limit."
     else:
@@ -457,7 +525,7 @@ def command_error(
         cause=cause,
         remedy=remedy or (finding.remedy if finding else None),
         retry_safe=retry_safe if retry_safe is not None else (finding.retry_safe if finding else None),
-        details=[REDACTOR.redact(line) for line in result.output.splitlines()[-15:]],
+        details=[REDACTOR.redact(line) for line in text.splitlines()[-15:]],
     )
 
 

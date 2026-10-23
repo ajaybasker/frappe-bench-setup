@@ -165,8 +165,8 @@ class Secrets:
         return f"Secrets(admin_password={state(self.admin_password)}, db_root_password={state(self.db_root_password)})"
 
 
-ENV_ADMIN_PASSWORD = "FRAPPE_SETUP_ADMIN_PASSWORD"
-ENV_DB_ROOT_PASSWORD = "FRAPPE_SETUP_DB_ROOT_PASSWORD"
+ENV_ADMIN_PASSWORD = "FRAPPE_SETUP_ADMIN_PASSWORD"  # noqa: S105 - env var name
+ENV_DB_ROOT_PASSWORD = "FRAPPE_SETUP_DB_ROOT_PASSWORD"  # noqa: S105 - env var name
 
 
 def read_secret_file(path: Path) -> str:
@@ -179,9 +179,7 @@ def read_secret_file(path: Path) -> str:
     if not stat.S_ISREG(st.st_mode):
         raise ValidationError(f"Secret file {path} is not a regular file.")
     if st.st_mode & (stat.S_IRWXG | stat.S_IRWXO):
-        raise ValidationError(
-            f"Secret file {path} is readable by other users; run `chmod 600 {path}` first."
-        )
+        raise ValidationError(f"Secret file {path} is readable by other users; run `chmod 600 {path}` first.")
     value = path.read_text(encoding="utf-8").rstrip("\r\n")
     if not value:
         raise ValidationError(f"Secret file {path} is empty.")

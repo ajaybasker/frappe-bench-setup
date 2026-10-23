@@ -1,0 +1,32 @@
+# Example non-interactive configuration for `./install.sh install --config <file>`.
+# Never put passwords here: use --admin-password-file / --db-root-password-file
+# or FRAPPE_SETUP_ADMIN_PASSWORD / FRAPPE_SETUP_DB_ROOT_PASSWORD.
+
+bench_name: erp-bench
+parent_dir: ~/frappe-projects
+frappe_branch: version-15
+site_name: erp.localhost
+
+database:
+  engine: mariadb        # mariadb | postgres (experimental)
+  host: 127.0.0.1
+  port: 3306
+  root_user: root
+
+# Installed in dependency order (required_apps are resolved automatically).
+# Omit `branch` to use the branch named like the Frappe branch (must exist).
+apps:
+  - key: erpnext
+    url: https://github.com/frappe/erpnext
+  - key: hrms
+    url: https://github.com/frappe/hrms
+    branch: version-15
+  # - key: my_custom_app
+  #   url: git@github.com:my-org/my_custom_app.git
+  #   branch: develop
+
+developer_mode: true
+set_default_site: true
+verify_http: true
+install_wkhtmltopdf: false
+enable_backups: false

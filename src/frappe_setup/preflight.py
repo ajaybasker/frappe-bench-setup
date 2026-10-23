@@ -46,9 +46,7 @@ class Requirements:
     notes: list[str] = field(default_factory=list)
 
 
-def effective_requirements(
-    matrix: Matrix, branch: BranchSpec, upstream: FrappeMetadata | None = None
-) -> Requirements:
+def effective_requirements(matrix: Matrix, branch: BranchSpec, upstream: FrappeMetadata | None = None) -> Requirements:
     notes: list[str] = []
     py_doc = branch.requirement("python")
     node_doc = branch.requirement("node")
@@ -177,8 +175,7 @@ def evaluate(
                 found=os_text,
                 required="Ubuntu 24.04 x86_64",
                 message="This operating system / architecture is not supported.",
-                remedy="Use Ubuntu 24.04 x86_64 (a VM or container is fine), or the official "
-                "frappe_docker images.",
+                remedy="Use Ubuntu 24.04 x86_64 (a VM or container is fine), or the official frappe_docker images.",
             )
         )
     if facts.arch == "x86_64" and facts.cpu_flags:
@@ -202,11 +199,27 @@ def evaluate(
     min_ram, rec_ram = int(res.get("min_ram_mb", 2048)), int(res.get("recommended_ram_mb", 4096))
     ram_text = f"{facts.mem_total_mb} MB total, {facts.mem_available_mb} MB available, {facts.swap_total_mb} MB swap"
     if facts.mem_total_mb < min_ram:
-        add(CheckItem("Memory", FAIL, ram_text, f">= {min_ram} MB", "Not enough RAM to build Frappe assets.",
-                      "Use a machine with at least 2 GB RAM (4 GB recommended)."))
+        add(
+            CheckItem(
+                "Memory",
+                FAIL,
+                ram_text,
+                f">= {min_ram} MB",
+                "Not enough RAM to build Frappe assets.",
+                "Use a machine with at least 2 GB RAM (4 GB recommended).",
+            )
+        )
     elif facts.mem_total_mb + facts.swap_total_mb < rec_ram:
-        add(CheckItem("Memory", WARN, ram_text, f">= {rec_ram} MB recommended",
-                      "Asset builds may fail with out-of-memory errors.", "Add swap space."))
+        add(
+            CheckItem(
+                "Memory",
+                WARN,
+                ram_text,
+                f">= {rec_ram} MB recommended",
+                "Asset builds may fail with out-of-memory errors.",
+                "Add swap space.",
+            )
+        )
     else:
         add(CheckItem("Memory", OK, ram_text, f">= {min_ram} MB"))
 
@@ -216,150 +229,306 @@ def evaluate(
         rec = float(res.get("recommended_free_disk_gb", 10))
         disk_text = f"{free} GB free at {target}"
         if free < need:
-            add(CheckItem("Disk space", FAIL, disk_text, f">= {need:g} GB",
-                          "Not enough free disk space for the bench and its dependencies.",
-                          "Free space or choose an installation directory on another filesystem."))
+            add(
+                CheckItem(
+                    "Disk space",
+                    FAIL,
+                    disk_text,
+                    f">= {need:g} GB",
+                    "Not enough free disk space for the bench and its dependencies.",
+                    "Free space or choose an installation directory on another filesystem.",
+                )
+            )
         elif free < rec:
-            add(CheckItem("Disk space", WARN, disk_text, f">= {rec:g} GB recommended",
-                          "Disk space is tight; more apps or sites may not fit."))
+            add(
+                CheckItem(
+                    "Disk space",
+                    WARN,
+                    disk_text,
+                    f">= {rec:g} GB recommended",
+                    "Disk space is tight; more apps or sites may not fit.",
+                )
+            )
         else:
             add(CheckItem("Disk space", OK, disk_text, f">= {need:g} GB"))
 
     # ---------------------------------------------------------------- user
     if facts.is_root:
-        add(CheckItem("User", WARN if allow_root else FAIL, found="root",
-                      required="regular user with sudo",
-                      message="Bench should not be run as root.",
-                      remedy="Create a regular user (`sudo adduser frappe && sudo usermod -aG sudo frappe`) "
-                      "and run the installer as that user. --allow-root exists for disposable containers."))
+        add(
+            CheckItem(
+                "User",
+                WARN if allow_root else FAIL,
+                found="root",
+                required="regular user with sudo",
+                message="Bench should not be run as root.",
+                remedy="Create a regular user (`sudo adduser frappe && sudo usermod -aG sudo frappe`) "
+                "and run the installer as that user. --allow-root exists for disposable containers.",
+            )
+        )
     else:
-        sudo_text = "no sudo" if not facts.sudo_available else (
-            "sudo (no password)" if facts.sudo_nopasswd else "sudo (password required)")
-        add(CheckItem("User", OK if facts.sudo_available else WARN, found=f"{facts.user}, {sudo_text}",
-                      required="regular user; sudo only needed for system packages",
-                      message="" if facts.sudo_available else "Missing system packages cannot be installed without sudo."))
+        sudo_text = (
+            "no sudo"
+            if not facts.sudo_available
+            else ("sudo (no password)" if facts.sudo_nopasswd else "sudo (password required)")
+        )
+        add(
+            CheckItem(
+                "User",
+                OK if facts.sudo_available else WARN,
+                found=f"{facts.user}, {sudo_text}",
+                required="regular user; sudo only needed for system packages",
+                message="" if facts.sudo_available else "Missing system packages cannot be installed without sudo.",
+            )
+        )
 
     # ---------------------------------------------------------------- runtimes
     preferred_py = str(branch.install.get("python")) if branch.install.get("python") else None
     py = pick_python(facts, req.python, preferred_py)
     if py:
         note = " (venv module missing: python3-venv will be installed)" if py.source.endswith("-no-venv") else ""
-        add(CheckItem("Python", OK if not note else MISSING, found=f"{py.version} {py.path} [{py.source}]{note}",
-                      required=str(req.python), fixable=True,
-                      message="Python venv support is missing" if note else ""))
+        add(
+            CheckItem(
+                "Python",
+                OK if not note else MISSING,
+                found=f"{py.version} {py.path} [{py.source}]{note}",
+                required=str(req.python),
+                fixable=True,
+                message="Python venv support is missing" if note else "",
+            )
+        )
     else:
         found = ", ".join(sorted({p.version for p in facts.pythons})) or "none"
-        add(CheckItem("Python", MISSING, found=found, required=str(req.python),
-                      message=f"No installed Python satisfies {req.python}.",
-                      remedy=f"frappe-setup can install Python {preferred_py} in user space with uv "
-                      "(system Python is not modified).", fixable=True))
+        add(
+            CheckItem(
+                "Python",
+                MISSING,
+                found=found,
+                required=str(req.python),
+                message=f"No installed Python satisfies {req.python}.",
+                remedy=f"frappe-setup can install Python {preferred_py} in user space with uv "
+                "(system Python is not modified).",
+                fixable=True,
+            )
+        )
 
     node = pick_node(facts, req.node)
     if node:
         add(CheckItem("Node.js", OK, found=f"{node.version} [{node.source}] {node.bin_dir}", required=str(req.node)))
     else:
         found = ", ".join(sorted({f"{n.version} [{n.source}]" for n in facts.nodes})) or "none"
-        add(CheckItem("Node.js", MISSING, found=found, required=str(req.node),
-                      message=f"No installed Node.js satisfies {req.node}.",
-                      remedy=f"frappe-setup can install Node.js {branch.install.get('node_major')} from nodejs.org "
-                      "into ~/.local/share/frappe-setup (system Node.js is not modified).", fixable=True))
+        add(
+            CheckItem(
+                "Node.js",
+                MISSING,
+                found=found,
+                required=str(req.node),
+                message=f"No installed Node.js satisfies {req.node}.",
+                remedy=f"frappe-setup can install Node.js {branch.install.get('node_major')} from nodejs.org "
+                "into ~/.local/share/frappe-setup (system Node.js is not modified).",
+                fixable=True,
+            )
+        )
 
-    add(version_check("Yarn", facts.tool("yarn").parsed, req.yarn,
-                      missing_remedy="Installed with npm into a user-owned prefix.",
-                      incompatible_remedy="Yarn 1.x (classic) is required; installed into a user-owned prefix."))
+    add(
+        version_check(
+            "Yarn",
+            facts.tool("yarn").parsed,
+            req.yarn,
+            missing_remedy="Installed with npm into a user-owned prefix.",
+            incompatible_remedy="Yarn 1.x (classic) is required; installed into a user-owned prefix.",
+        )
+    )
     pip = facts.tool("pip")
-    add(CheckItem("pip", INFO, found=pip.version or "not found",
-                  required=branch.requirement("pip") or "",
-                  message="Bench creates its own virtualenv and upgrades pip inside it."))
-    add(version_check("Bench CLI", facts.tool("bench").parsed, req.bench,
-                      missing_remedy="Installed with `uv tool install frappe-bench` (user space).",
-                      incompatible_remedy="Upgraded with `uv tool install --upgrade frappe-bench`."))
+    add(
+        CheckItem(
+            "pip",
+            INFO,
+            found=pip.version or "not found",
+            required=branch.requirement("pip") or "",
+            message="Bench creates its own virtualenv and upgrades pip inside it.",
+        )
+    )
+    add(
+        version_check(
+            "Bench CLI",
+            facts.tool("bench").parsed,
+            req.bench,
+            missing_remedy="Installed with `uv tool install frappe-bench` (user space).",
+            incompatible_remedy="Upgraded with `uv tool install --upgrade frappe-bench`.",
+        )
+    )
     uv = facts.tool("uv")
-    add(CheckItem("uv", OK if uv.found else MISSING, found=uv.version or "not found", required="any",
-                  message="" if uv.found else "uv is used to install Bench (and Python if needed).",
-                  remedy="Installed into ~/.local/share/frappe-setup/tools with pip (user space).",
-                  fixable=True))
+    add(
+        CheckItem(
+            "uv",
+            OK if uv.found else MISSING,
+            found=uv.version or "not found",
+            required="any",
+            message="" if uv.found else "uv is used to install Bench (and Python if needed).",
+            remedy="Installed into ~/.local/share/frappe-setup/tools with pip (user space).",
+            fixable=True,
+        )
+    )
 
     # ---------------------------------------------------------------- system tools
     add(version_check("Git", facts.tool("git").parsed, None, missing_remedy="apt: git"))
     for tool, pkg in (("gcc", "build-essential"), ("make", "build-essential"), ("pkg-config", "pkg-config")):
-        add(version_check(tool, facts.tool(tool).parsed or (Version("0") if facts.tool(tool).found else None), None,
-                          missing_remedy=f"apt: {pkg}"))
+        add(
+            version_check(
+                tool,
+                facts.tool(tool).parsed or (Version("0") if facts.tool(tool).found else None),
+                None,
+                missing_remedy=f"apt: {pkg}",
+            )
+        )
     if facts.os_id in ("ubuntu", "debian"):
         for pkg in ("libmariadb-dev", "libffi-dev", "libssl-dev"):
             present = pkg in facts.apt_installed
-            add(CheckItem(f"{pkg}", OK if present else MISSING, found="installed" if present else "not installed",
-                          required="installed", remedy=f"apt: {pkg}", fixable=True))
+            add(
+                CheckItem(
+                    f"{pkg}",
+                    OK if present else MISSING,
+                    found="installed" if present else "not installed",
+                    required="installed",
+                    remedy=f"apt: {pkg}",
+                    fixable=True,
+                )
+            )
 
     # ---------------------------------------------------------------- database
     if db_engine == "mariadb":
         installed = mariadb_installed_version(facts)
         if installed is None:
-            add(CheckItem("MariaDB server", MISSING, found="not installed", required=str(req.mariadb),
-                          remedy="Installed with apt (from the MariaDB repository if the distribution "
-                          "version is too old).", fixable=True))
+            add(
+                CheckItem(
+                    "MariaDB server",
+                    MISSING,
+                    found="not installed",
+                    required=str(req.mariadb),
+                    remedy="Installed with apt (from the MariaDB repository if the distribution version is too old).",
+                    fixable=True,
+                )
+            )
         elif satisfies(installed, req.mariadb):
             warn_above = branch.requirement("mariadb_upstream_warns_above")
             msg = ""
             if warn_above and installed.release[:2] > (parse_version(warn_above) or Version("0")).release[:2]:
-                msg = (f"Frappe prints an 'untested above {warn_above}' warning for this MariaDB version; "
-                       "the documented minimum is met.")
+                msg = (
+                    f"Frappe prints an 'untested above {warn_above}' warning for this MariaDB version; "
+                    "the documented minimum is met."
+                )
             add(CheckItem("MariaDB server", OK, found=str(installed), required=str(req.mariadb), message=msg))
         else:
-            add(CheckItem("MariaDB server", WARN if allow_db_version_mismatch else FAIL,
-                          found=str(installed), required=str(req.mariadb),
-                          message=f"Installed MariaDB {installed} is older than the {branch.label} requirement.",
-                          remedy="frappe-setup does not upgrade an existing database server. Upgrade MariaDB "
-                          "yourself (https://mariadb.org/download/), use a fresh VM/container, or pass "
-                          "--allow-db-version-mismatch to continue at your own risk."))
+            add(
+                CheckItem(
+                    "MariaDB server",
+                    WARN if allow_db_version_mismatch else FAIL,
+                    found=str(installed),
+                    required=str(req.mariadb),
+                    message=f"Installed MariaDB {installed} is older than the {branch.label} requirement.",
+                    remedy="frappe-setup does not upgrade an existing database server. Upgrade MariaDB "
+                    "yourself (https://mariadb.org/download/), use a fresh VM/container, or pass "
+                    "--allow-db-version-mismatch to continue at your own risk.",
+                )
+            )
         client = facts.tool("mariadb")
-        add(CheckItem("MariaDB client", OK if client.found else MISSING, found=client.version or "not found",
-                      required="installed", remedy="apt: mariadb-client", fixable=True))
+        add(
+            CheckItem(
+                "MariaDB client",
+                OK if client.found else MISSING,
+                found=client.version or "not found",
+                required="installed",
+                remedy="apt: mariadb-client",
+                fixable=True,
+            )
+        )
         state = facts.services.get("mariadb", "unknown")
         if installed is not None:
-            add(CheckItem("MariaDB service", OK if state == "active" else (WARN if state == "unknown" else MISSING),
-                          found=state, required="active",
-                          message="" if state == "active" else "The MariaDB service is not running.",
-                          remedy="Started with systemctl/service (requires sudo).", fixable=state != "active"))
+            add(
+                CheckItem(
+                    "MariaDB service",
+                    OK if state == "active" else (WARN if state == "unknown" else MISSING),
+                    found=state,
+                    required="active",
+                    message="" if state == "active" else "The MariaDB service is not running.",
+                    remedy="Started with systemctl/service (requires sudo).",
+                    fixable=state != "active",
+                )
+            )
     else:
         psql = facts.tool("psql")
-        add(CheckItem("PostgreSQL client", OK if psql.found else FAIL, found=psql.version or "not found",
-                      required=str(req.postgres),
-                      message="" if psql.found else "PostgreSQL support requires an existing PostgreSQL server.",
-                      remedy="Install and configure PostgreSQL yourself (`sudo apt install postgresql`); "
-                      "PostgreSQL support in frappe-setup is experimental."))
-        add(CheckItem("PostgreSQL service", OK if facts.services.get("postgresql") == "active" else WARN,
-                      found=facts.services.get("postgresql", "unknown"), required="active"))
+        add(
+            CheckItem(
+                "PostgreSQL client",
+                OK if psql.found else FAIL,
+                found=psql.version or "not found",
+                required=str(req.postgres),
+                message="" if psql.found else "PostgreSQL support requires an existing PostgreSQL server.",
+                remedy="Install and configure PostgreSQL yourself (`sudo apt install postgresql`); "
+                "PostgreSQL support in frappe-setup is experimental.",
+            )
+        )
+        add(
+            CheckItem(
+                "PostgreSQL service",
+                OK if facts.services.get("postgresql") == "active" else WARN,
+                found=facts.services.get("postgresql", "unknown"),
+                required="active",
+            )
+        )
 
-    add(version_check("Redis", facts.tool("redis-server").parsed, req.redis,
-                      missing_remedy="apt: redis-server (Bench starts its own Redis processes).",
-                      incompatible_remedy="Install a newer redis-server."))
+    add(
+        version_check(
+            "Redis",
+            facts.tool("redis-server").parsed,
+            req.redis,
+            missing_remedy="apt: redis-server (Bench starts its own Redis processes).",
+            incompatible_remedy="Install a newer redis-server.",
+        )
+    )
 
     # ---------------------------------------------------------------- optional
     if branch.needs_wkhtmltopdf:
         wk = facts.tool("wkhtmltopdf")
-        add(CheckItem("wkhtmltopdf", OK if wk.found else (MISSING if want_wkhtmltopdf else WARN),
-                      found=wk.version or "not found", required="optional (PDF printing)",
-                      message="" if wk.found else "PDF generation will not work until wkhtmltopdf is installed.",
-                      remedy="apt: wkhtmltopdf (Ubuntu build without patched Qt).", fixable=want_wkhtmltopdf))
+        add(
+            CheckItem(
+                "wkhtmltopdf",
+                OK if wk.found else (MISSING if want_wkhtmltopdf else WARN),
+                found=wk.version or "not found",
+                required="optional (PDF printing)",
+                message="" if wk.found else "PDF generation will not work until wkhtmltopdf is installed.",
+                remedy="apt: wkhtmltopdf (Ubuntu build without patched Qt).",
+                fixable=want_wkhtmltopdf,
+            )
+        )
 
     # ---------------------------------------------------------------- ports
     busy = [str(p) for p, used in sorted(facts.ports_in_use.items()) if used]
     if busy:
-        add(CheckItem("Ports", WARN, found=f"in use: {', '.join(busy)}",
-                      required=", ".join(str(p) for p in sorted(facts.ports_in_use)),
-                      message="Some default Bench ports are in use (another bench may be running). "
-                      "`bench start` will fail until they are free.",
-                      remedy="Stop the other bench, or edit ports in sites/common_site_config.json and config/redis_*.conf."))
+        add(
+            CheckItem(
+                "Ports",
+                WARN,
+                found=f"in use: {', '.join(busy)}",
+                required=", ".join(str(p) for p in sorted(facts.ports_in_use)),
+                message="Some default Bench ports are in use (another bench may be running). "
+                "`bench start` will fail until they are free.",
+                remedy="Stop the other bench, or edit ports in sites/common_site_config.json and config/redis_*.conf.",
+            )
+        )
     elif facts.ports_in_use:
         add(CheckItem("Ports", OK, found="free", required=", ".join(str(p) for p in sorted(facts.ports_in_use))))
 
     # ---------------------------------------------------------------- benches
     if facts.benches:
-        listing = "; ".join(
-            f"{b.path} ({b.frappe_branch or '?'}, {len(b.sites)} site(s))" for b in facts.benches[:5]
+        listing = "; ".join(f"{b.path} ({b.frappe_branch or '?'}, {len(b.sites)} site(s))" for b in facts.benches[:5])
+        add(
+            CheckItem(
+                "Existing benches",
+                INFO,
+                found=listing,
+                message="Existing benches are never modified unless you choose to reuse one.",
+            )
         )
-        add(CheckItem("Existing benches", INFO, found=listing,
-                      message="Existing benches are never modified unless you choose to reuse one."))
 
     return PreflightReport(branch=branch.name, items=items, requirements=req, python=py, node=node)

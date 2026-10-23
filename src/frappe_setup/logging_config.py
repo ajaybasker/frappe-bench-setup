@@ -31,7 +31,7 @@ class _Formatter(logging.Formatter):
             record.phase = "-"
         return super().format(record)
 
-    def formatTime(self, record: logging.LogRecord, datefmt: str | None = None) -> str:  # noqa: N802
+    def formatTime(self, record: logging.LogRecord, datefmt: str | None = None) -> str:
         return datetime.fromtimestamp(record.created).astimezone().isoformat(timespec="milliseconds")
 
 
