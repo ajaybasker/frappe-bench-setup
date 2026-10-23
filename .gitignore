@@ -34,3 +34,8 @@ tests/integration/.artifacts/
 .vscode/
 *.swp
 .DS_Store
+
+# npm
+node_modules/
+*.tgz
+npm-debug.log*

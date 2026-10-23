@@ -39,6 +39,18 @@ Every error panel shows **Phase**, **Command**, **Exit code**, **Likely cause**,
 | `node: not found` / wrong Node when running `bench` later | New terminal without the env script | `source ~/.local/share/frappe-setup/env/<bench>-<id>.sh` (path in `status`) |
 | `Frappe prints an 'untested above 10.8' warning` (v15) | Frappe's own warning for MariaDB 10.11/11.x | Informational; the documented minimum (10.6.6) is met |
 
+## npm launcher (`npx frappe-setup-cli`)
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `x Frappe Setup CLI runs on Linux only` | macOS / Windows | Use an Ubuntu 24.04 VM or container (WSL2 is Linux but untested) |
+| `x Python 3.10+ was not found on PATH` | No usable `python3` | `sudo apt install python3 python3-venv` |
+| `x Node.js 18+ is required` | Old Node.js running npx | Upgrade Node.js (nodejs.org or nvm) — the bench's own Node.js is handled separately |
+| `x The package is incomplete` | Corrupted npm cache / partial install | `npx clear-npx-cache` or `npm install -g frappe-setup-cli` again |
+| `npm error code EACCES` on `npm install -g` | Global prefix owned by root | `npm install -g --prefix ~/.local frappe-setup-cli` (and make sure `~/.local/bin` is on PATH), or use `npx` |
+| `Could not install the CLI dependencies` | No access to PyPI while preparing `~/.local/share/frappe-setup/npm-runtime/venv` | Check network/proxy, then rerun (safe) |
+| Strange Python errors after an upgrade | Stale runtime environment | `rm -rf ~/.local/share/frappe-setup/npm-runtime` and rerun (your benches are not affected) |
+
 ## Starting over safely
 
 frappe-setup never deletes your data. To discard a test installation yourself:

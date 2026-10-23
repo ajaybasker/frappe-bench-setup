@@ -3,15 +3,12 @@
 **One command to get a working, verified Frappe Framework development environment.**
 
 ```bash
-git clone https://github.com/ajaybasker/frappe-bench-setup.git
-cd frappe-bench-setup
-./install.sh
+npx frappe-setup-cli
 ```
 
-That's it. `./install.sh` prepares the installer, then a guided wizard does the rest: it checks your
-machine, installs what's missing (it asks before using `sudo`), creates the bench and site, installs the
-apps you picked, and checks that the site actually answers in a browser. At the end it prints the exact
-commands to start working:
+That's it. The wizard checks your machine, installs what's missing (it asks before using `sudo`),
+creates the bench and site, installs the apps you picked, and checks that the site actually answers in a
+browser. At the end it prints the exact commands to start working:
 
 ```bash
 source ~/.local/share/frappe-setup/env/frappe-bench-<id>.sh   # path is printed by the installer
@@ -19,6 +16,40 @@ cd ~/frappe-projects/frappe-bench
 bench start
 # open http://localhost:8000  →  login: Administrator / the password you chose
 ```
+
+> `npx frappe-setup-cli` works once version 1.0.0 is published to the npm registry
+> (see [Release and publishing](#release-and-publishing)). Until then, or if you prefer git, use:
+>
+> ```bash
+> git clone https://github.com/ajaybasker/frappe-bench-setup.git
+> cd frappe-bench-setup
+> ./install.sh
+> ```
+>
+> Both start the same installer and accept the same commands and options
+> (`./install.sh check` = `npx frappe-setup-cli check`, and so on).
+
+### Three ways to run it
+
+| Method | Command | When to use |
+|--------|---------|-------------|
+| npx (no install) | `npx frappe-setup-cli` | One-off setup; always uses the latest published version |
+| Global npm install | `npm install -g frappe-setup-cli` then `frappe-setup-cli` | You run it often (`frappe-setup-cli status`, `doctor`, `resume`) |
+| Git checkout | `./install.sh` | Development of this tool, or machines without Node.js |
+
+Every command shown below as `./install.sh <command>` works the same as `npx frappe-setup-cli <command>` or
+`frappe-setup-cli <command>`. Messages from the installer name the command you actually used.
+
+### What the npm package needs vs. what Frappe needs
+
+| | Needed before you start | Installed for you (with permission) |
+|---|---|---|
+| **npm launcher** | Linux, Node.js ≥ 18 with npm/npx, `bash`, Python ≥ 3.10 (preinstalled on Ubuntu 24.04) | `python3-venv` if missing (asks first) and a private Python environment for the installer in `~/.local/share/frappe-setup/npm-runtime/` |
+| **Frappe itself** | Ubuntu 24.04 x86_64, a regular user with `sudo` | build tools, MariaDB, Redis, a compatible Python, Node.js and Yarn for the bench, the Bench CLI — see [Prerequisites](#prerequisites) |
+
+The Node.js that runs `npx` is only used to launch the installer. The bench gets the Node.js version its
+Frappe branch requires (e.g. 24 for v16), installed in user space if your system Node.js doesn't fit;
+your system Node.js is never replaced.
 
 ---
 
@@ -33,13 +64,15 @@ bench start
 7. [ERPNext, official and custom apps](#erpnext-official-and-custom-apps)
 8. [After installation: everyday Bench commands](#after-installation-everyday-bench-commands)
 9. [All frappe-setup commands](#all-frappe-setup-commands)
-10. [Non-interactive / advanced usage](#non-interactive--advanced-usage)
-11. [Logs, resume and recovery](#logs-resume-and-recovery)
-12. [Troubleshooting](#troubleshooting)
-13. [Security](#security)
-14. [Development and testing](#development-and-testing)
-15. [Known limitations](#known-limitations)
-16. [Contributing](#contributing)
+10. [npm package details](#npm-package-details)
+11. [Non-interactive / advanced usage](#non-interactive--advanced-usage)
+12. [Logs, resume and recovery](#logs-resume-and-recovery)
+13. [Troubleshooting](#troubleshooting)
+14. [Security](#security)
+15. [Development and testing](#development-and-testing)
+16. [Known limitations](#known-limitations)
+17. [Contributing](#contributing)
+18. [Release and publishing](#release-and-publishing)
 
 ---
 
@@ -83,8 +116,8 @@ Resources: at least 2 GB RAM (4 GB RAM+swap recommended), 4 GB free disk for Fra
 ## Prerequisites
 
 - Ubuntu 24.04 with a **regular user that can use `sudo`** (do not run as root).
-- `python3` (preinstalled on Ubuntu) and an internet connection.
-- `git` to clone this repository.
+- `python3` ≥ 3.10 (preinstalled on Ubuntu) and an internet connection (GitHub, PyPI, npm registry, nodejs.org, Ubuntu mirrors).
+- For `npx` / `npm install -g`: Node.js ≥ 18 with npm. For the git method: `git`.
 
 Everything else (build tools, MariaDB, Redis, a compatible Python, Node.js, Yarn, Bench CLI) is detected and
 installed for you if needed.
@@ -238,6 +271,40 @@ Run them via `./install.sh <command>` or directly as `.venv/bin/frappe-setup <co
 | `./install.sh resume` | Continue the last unfinished installation (asks for passwords again) | after confirmation |
 | `./install.sh logs` | Show the latest log (`--list`, `--show FILE`, `-n 200`, `--path`) — secrets redacted | no |
 
+## npm package details
+
+`frappe-setup-cli` on npm is a thin launcher around the same Python installer that `./install.sh` runs; it
+contains no installation logic of its own and has no npm dependencies.
+
+What happens when you run `npx frappe-setup-cli [command] [options]`:
+
+1. The launcher (`bin/frappe-setup-cli.js`) prints its version, platform and Python version (to stderr, so
+   `check --json` output stays clean), and checks: Linux, Node.js ≥ 18, `bash`, Python ≥ 3.10, and that the
+   package files are complete. If something is missing it explains how to fix it and stops — nothing is changed.
+2. It runs the bundled `install.sh` with `bash`, passing your arguments unchanged (as an argument list, never
+   through a shell), in **your current directory** (so relative paths such as `--config ./my.yaml` work).
+3. `install.sh` creates (once) a private Python environment in
+   `~/.local/share/frappe-setup/npm-runtime/venv` — not inside the npm package, which may be read-only (global
+   installs) or cleaned up (npx cache) — and reinstalls it automatically when a new package version arrives.
+4. The Python installer runs with your terminal attached: the wizard, hidden password prompts and progress work
+   exactly as with `./install.sh`. Ctrl+C reaches the installer, which stops safely and tells you how to resume.
+5. The launcher exits with the installer's exit code (0 success, 1 failure, 2 invalid input, 130 interrupted).
+
+Installing globally instead of using npx:
+
+```bash
+npm install -g frappe-setup-cli     # or, without root: npm install -g --prefix ~/.local frappe-setup-cli
+frappe-setup-cli                     # wizard
+frappe-setup-cli status              # same commands as ./install.sh
+npm uninstall -g frappe-setup-cli    # remove the launcher
+rm -rf ~/.local/share/frappe-setup/npm-runtime   # optional: remove its Python environment
+```
+
+Uninstalling the launcher never touches your benches, sites or databases.
+
+The package contains only: the launcher (`bin/`, `lib/`), `install.sh`, the Python sources (`src/frappe_setup/*.py`),
+`pyproject.toml`, `config/*.yaml`, documentation and the license. No tests, virtualenvs, caches, logs or secrets.
+
 ## Non-interactive / advanced usage
 
 All wizard answers are available as flags; passwords only via files (mode 600) or environment variables.
@@ -311,7 +378,14 @@ python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 FRAPPE_SETUP_NETWORK_TESTS=1 .venv/bin/pytest -m network      # read-only checks against GitHub
 tests/integration/run_e2e.sh version-15                      # full install in a disposable Docker container
 tests/integration/run_e2e.sh version-16 --erpnext
+
+npm test                                                      # npm launcher tests (fake installer; no changes made)
+npm run test:pack                                             # npm pack -> global install + npx from the tarball (isolated HOME)
+E2E_VIA=npx tests/integration/run_e2e.sh version-15 --erpnext   # full install via npx on a clean container
 ```
+
+On networks that block some plain-HTTP Ubuntu downloads, prefix the Docker tests with
+`E2E_APT_MIRROR=https://mirrors.edge.kernel.org/ubuntu`.
 
 The end-to-end script builds a clean Ubuntu 24.04 image, runs `./install.sh` as a non-root sudo user,
 checks `status`/`doctor`, reruns the install to prove idempotency, and scans all logs/state/output for the
@@ -356,3 +430,42 @@ Debian/aarch64. See [docs/supported-platforms.md](docs/supported-platforms.md).
 4. Never add flags that take secrets as arguments, and never add `shell=True`.
 
 License: MIT (see [LICENSE](LICENSE)).
+
+## Release and publishing
+
+Publishing is always a manual, human decision; no script in this repository publishes anything.
+
+1. Bump the version in **both** `package.json` and `pyproject.toml`/`src/frappe_setup/__init__.py`
+   (`npm test` fails if they differ), and update the test results above.
+2. Run every check:
+
+   ```bash
+   .venv/bin/pytest && .venv/bin/ruff check src tests && .venv/bin/mypy
+   npm test
+   npm run test:pack
+   E2E_VIA=npx tests/integration/run_e2e.sh version-15 --erpnext
+   tests/integration/run_e2e.sh version-16
+   ```
+
+3. Inspect what will be published:
+
+   ```bash
+   npm pkg get name version bin files engines
+   npm pack --dry-run
+   npm view frappe-setup-cli          # "404 Not Found" = the name is still free; otherwise check ownership
+   ```
+
+4. Log in and publish (requires an npm account; 2FA is recommended):
+
+   ```bash
+   npm login
+   npm whoami
+   npm publish --dry-run              # final check of the exact upload
+   npm publish --access public        # irreversible for this version number
+   ```
+
+5. Verify from a clean shell: `npx frappe-setup-cli@1.0.0 --version` and `npx frappe-setup-cli check`.
+6. Tag the release: `git tag v1.0.0 && git push origin v1.0.0`.
+
+A published version can be deprecated (`npm deprecate`) but not replaced; fix mistakes with a new version.
+

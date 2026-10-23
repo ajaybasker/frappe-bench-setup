@@ -17,6 +17,15 @@ RUN if [ -n "$APT_MIRROR" ]; then \
             /etc/apt/sources.list.d/ubuntu.sources; \
     fi
 
+# Optional: Node.js for testing the npm launcher (`npx frappe-setup-cli`), installed the way a
+# user would get it from nodejs.org. Empty NODE_VERSION = no Node.js (default).
+ARG NODE_VERSION=""
+RUN if [ -n "$NODE_VERSION" ]; then \
+        python3 -c "import urllib.request; urllib.request.urlretrieve('https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-x64.tar.gz', '/tmp/node.tgz')" \
+        && tar -xzf /tmp/node.tgz -C /usr/local --strip-components=1 \
+        && rm /tmp/node.tgz && node --version && npm --version; \
+    fi
+
 # Ubuntu 24.04 images ship a default 'ubuntu' user (uid 1000); use a dedicated one.
 RUN useradd --create-home --shell /bin/bash dev \
     && echo 'dev ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/dev \

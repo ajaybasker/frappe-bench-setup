@@ -67,6 +67,17 @@ Do not expose a development bench to untrusted networks.
 
 Archive extraction rejects absolute paths, `..`, links escaping the target and device files.
 
+## npm launcher
+
+- The npm package has no dependencies and no install scripts (`preinstall`/`postinstall`); nothing runs
+  at `npm install` time.
+- The launcher runs only the bundled `install.sh` with `bash`, passing arguments as an argument list
+  (no shell parsing); arguments with NUL bytes or excessive length are rejected.
+- It never uses `sudo` itself; privileged steps are requested by the installer as described above.
+- No telemetry of any kind.
+- The installer's private environment is created in the user's home (`~/.local/share/frappe-setup/npm-runtime`),
+  never inside the npm package or a system directory.
+
 ## Reporting a vulnerability
 
 Please open a private security advisory on the repository instead of a public issue.

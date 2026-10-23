@@ -481,7 +481,7 @@ def status(
         typer.echo(json.dumps(out, indent=2))
         return
     if not out:
-        ui.info("No installations recorded yet. Run [bold]frappe-setup[/] to create one.")
+        ui.info("No installations recorded yet. Create one with: frappe-setup install")
         return
     for e in out:
         rows = [

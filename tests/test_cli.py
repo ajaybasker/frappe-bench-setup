@@ -38,7 +38,7 @@ def test_help_lists_commands() -> None:
 
 def test_version() -> None:
     result = runner.invoke(cli.app, ["--version"])
-    assert result.exit_code == 0 and "frappe-setup 0.1.0" in result.output
+    assert result.exit_code == 0 and "frappe-setup 1.0.0" in result.output
 
 
 def test_install_help_has_no_password_flags() -> None:
@@ -196,3 +196,24 @@ def test_logs_show_redacts(isolated_home) -> None:
     log.write_text("line --db-root-password=abc12345\n")
     result = runner.invoke(cli.app, ["logs"])
     assert result.exit_code == 0 and "abc12345" not in result.output and "********" in result.output
+
+
+@pytest.mark.parametrize(
+    "launcher,expected",
+    [
+        (None, "frappe-setup resume"),
+        ("./install.sh", "./install.sh resume"),
+        ("npx frappe-setup-cli", "npx frappe-setup-cli resume"),
+        ("frappe-setup-cli", "frappe-setup-cli resume"),
+        ("rm -rf ~", "frappe-setup resume"),  # unknown values are ignored
+    ],
+)
+def test_messages_name_the_command_the_user_types(monkeypatch, launcher, expected) -> None:
+    from frappe_setup.ui import localize
+
+    if launcher is None:
+        monkeypatch.delenv("FRAPPE_SETUP_COMMAND", raising=False)
+    else:
+        monkeypatch.setenv("FRAPPE_SETUP_COMMAND", launcher)
+    assert localize("Fix it, then run `frappe-setup resume`.") == f"Fix it, then run `{expected}`."
+    assert localize("frappe-setup-cli is the npm name") == "frappe-setup-cli is the npm name"

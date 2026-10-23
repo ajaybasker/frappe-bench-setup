@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import contextlib
 import getpass
+import os
+import re
 import sys
 import time
 from collections.abc import Callable, Iterator, Sequence
@@ -36,6 +38,23 @@ _STATUS_STYLE = {
     MISSING: ("✘", "red"),
     INFO: ("i", "cyan"),
 }
+
+
+# How the user started this program; messages such as "run `frappe-setup resume`" are shown with
+# the command they actually type. Set by install.sh and the npm launcher; unknown values ignored.
+_KNOWN_COMMANDS = ("frappe-setup", "./install.sh", "frappe-setup-cli", "npx frappe-setup-cli")
+_COMMAND_RE = re.compile(r"\bfrappe-setup(?= (?:check|install|status|doctor|resume|logs)\b)")
+
+
+def invocation() -> str:
+    value = os.environ.get("FRAPPE_SETUP_COMMAND", "")
+    return value if value in _KNOWN_COMMANDS else "frappe-setup"
+
+
+def localize(text: str) -> str:
+    """'frappe-setup resume' -> '<how the user runs this> resume'."""
+    command = invocation()
+    return text if command == "frappe-setup" or not text else _COMMAND_RE.sub(command, text)
 
 
 def _cell(value: str) -> Text:
@@ -69,16 +88,16 @@ class UI:
         self.console.rule(f"[bold]Step {number}{total}: {title}", align="left", style="cyan")
 
     def info(self, message: str) -> None:
-        self.console.print(message)
+        self.console.print(localize(message))
 
     def success(self, message: str) -> None:
-        self.console.print(f"[green]✔[/] {message}")
+        self.console.print(f"[green]✔[/] {localize(message)}")
 
     def warn(self, message: str) -> None:
-        self.console.print(f"[yellow]![/] {message}")
+        self.console.print(f"[yellow]![/] {localize(message)}")
 
     def error(self, message: str) -> None:
-        self.err.print(f"[red]✘[/] {message}")
+        self.err.print(f"[red]✘[/] {localize(message)}")
 
     def check_table(self, items: Sequence[CheckItem], title: str = "") -> None:
         table = Table(title=title or None, show_lines=False, expand=False, title_justify="left")
@@ -94,7 +113,9 @@ class UI:
             note = item.message
             if item.status in (FAIL, MISSING, WARN) and item.remedy:
                 note = f"{note} → {item.remedy}" if note else item.remedy
-            table.add_row(Text(symbol, style=style), Text(item.name), Text(item.found), Text(item.required), Text(note))
+            table.add_row(
+                Text(symbol, style=style), Text(item.name), Text(item.found), Text(item.required), Text(localize(note))
+            )
         self.console.print(table)
 
     def key_values(self, rows: Sequence[tuple[str, str]], title: str = "") -> None:
@@ -102,11 +123,11 @@ class UI:
         table.add_column(style="bold cyan")
         table.add_column()
         for key, value in rows:
-            table.add_row(Text(key), _cell(value))
+            table.add_row(Text(key), _cell(localize(value)))
         self.console.print(table)
 
     def panel(self, body: str, title: str = "", style: str = "cyan") -> None:
-        self.console.print(Panel(body, title=title or None, border_style=style, expand=False))
+        self.console.print(Panel(localize(body), title=title or None, border_style=style, expand=False))
 
     def show_error(self, exc: SetupError) -> None:
         lines = [f"[bold red]{exc.message}[/]"]
@@ -116,16 +137,18 @@ class UI:
             lines.append(f"[bold]Command:[/]     {exc.command}")
         if exc.exit_code is not None:
             lines.append(f"[bold]Exit code:[/]   {exc.exit_code}")
-        lines.append(f"[bold]Likely cause:[/] {exc.cause or 'Unknown — see the log for the full output.'}")
+        lines.append(
+            f"[bold]Likely cause:[/] {escape(localize(exc.cause or 'Unknown — see the log for the full output.'))}"
+        )
         if exc.remedy:
-            lines.append(f"[bold]Fix:[/]         {exc.remedy}")
+            lines.append(f"[bold]Fix:[/]         {escape(localize(exc.remedy))}")
         if exc.retry_safe is not None:
             lines.append(f"[bold]Safe to retry:[/] {'yes' if exc.retry_safe else 'no — fix the cause first'}")
         if exc.log_file:
             lines.append(f"[bold]Log file:[/]    {exc.log_file}")
         if exc.details:
             lines.append("[bold]Last output:[/]")
-            lines.extend(f"  [dim]{Text(d).plain}[/]" for d in exc.details[-10:])
+            lines.extend(f"  [dim]{escape(d)}[/]" for d in exc.details[-10:])
         self.err.print(Panel("\n".join(lines), title="Setup failed", border_style="red", expand=False))
 
     # ------------------------------------------------------------ input

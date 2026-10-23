@@ -1,0 +1,46 @@
+{
+  "name": "frappe-setup-cli",
+  "version": "1.0.0",
+  "description": "One-command, guided and verified Frappe Framework / ERPNext development environment installer (launches the bundled Python installer)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ajaybasker/frappe-bench-setup.git"
+  },
+  "homepage": "https://github.com/ajaybasker/frappe-bench-setup#readme",
+  "bugs": {
+    "url": "https://github.com/ajaybasker/frappe-bench-setup/issues"
+  },
+  "keywords": [
+    "frappe",
+    "erpnext",
+    "bench",
+    "installer",
+    "cli",
+    "setup"
+  ],
+  "os": [
+    "linux"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "bin": {
+    "frappe-setup-cli": "bin/frappe-setup-cli.js"
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "install.sh",
+    "pyproject.toml",
+    "src/frappe_setup/**/*.py",
+    "config/*.yaml",
+    "docs/*.md",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test tests/npm/",
+    "test:pack": "bash tests/npm/pack-smoke.sh"
+  }
+}

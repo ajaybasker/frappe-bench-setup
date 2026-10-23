@@ -4,6 +4,10 @@
 #   tests/integration/run_e2e.sh <frappe-branch> [extra install args...]
 #   e.g. tests/integration/run_e2e.sh version-15
 #        tests/integration/run_e2e.sh version-16 --erpnext
+#        E2E_VIA=npx tests/integration/run_e2e.sh version-15   # via `npx` from the npm tarball
+#
+# E2E_VIA=repo (default): copy the repository into the container and run ./install.sh.
+# E2E_VIA=npx: `npm pack` on the host, copy only the tarball, run `npx --package <tgz> frappe-setup-cli`.
 #
 # Steps inside the container (as a non-root sudo user):
 #   1. copy the repository (simulates `git clone`)
@@ -19,11 +23,20 @@ shift || true
 EXTRA_ARGS=("$@")
 REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 IMAGE="frappe-setup-e2e:ubuntu-24.04"
-NAME="frappe-setup-e2e-${BRANCH}-$(date +%s)"
+VIA="${E2E_VIA:-repo}"
+[[ "${VIA}" == "repo" || "${VIA}" == "npx" ]] || { echo "E2E_VIA must be repo or npx" >&2; exit 2; }
+NAME="frappe-setup-e2e-${VIA}-${BRANCH}-$(date +%s)"
 ART="${REPO}/tests/integration/.artifacts/${NAME}"
 mkdir -p "${ART}"
 
-docker build -q --build-arg "APT_MIRROR=${E2E_APT_MIRROR:-}" -t "${IMAGE}" "${REPO}/tests/integration" >/dev/null
+NODE_ARG=""
+if [[ "${VIA}" == "npx" ]]; then
+    IMAGE="${IMAGE}-node"
+    NODE_ARG="${E2E_NODE_VERSION:-20.20.2}"
+    TARBALL="$(cd "${REPO}" && npm pack --pack-destination "${ART}" --silent)"
+fi
+docker build -q --build-arg "APT_MIRROR=${E2E_APT_MIRROR:-}" --build-arg "NODE_VERSION=${NODE_ARG}" \
+    -t "${IMAGE}" "${REPO}/tests/integration" >/dev/null
 
 cleanup() {
     docker cp "${NAME}:/home/dev/.local/state/frappe-setup" "${ART}/state" >/dev/null 2>&1 || true
@@ -40,10 +53,19 @@ DB_PW="Db-$(head -c 12 /dev/urandom | od -An -tx1 | tr -d ' \n')"
 docker exec -i "${NAME}" bash -c 'umask 077; cat > ~/admin.pw' <<<"${ADMIN_PW}"
 docker exec -i "${NAME}" bash -c 'umask 077; cat > ~/db.pw' <<<"${DB_PW}"
 
-docker exec "${NAME}" bash -c 'mkdir -p ~/frappe-setup-cli && cd /src && tar --exclude=./.venv --exclude=./tests/integration/.artifacts -cf - . | tar -xf - -C ~/frappe-setup-cli'
+if [[ "${VIA}" == "npx" ]]; then
+    # Only the npm tarball goes into the container - no repository checkout.
+    docker cp "${ART}/${TARBALL}" "${NAME}:/home/dev/${TARBALL}"
+    CLI="npx --yes --package ~/${TARBALL} frappe-setup-cli"
+    CLI_DIR="~"
+else
+    docker exec "${NAME}" bash -c 'mkdir -p ~/frappe-setup-cli && cd /src && tar --exclude=./.venv --exclude=./tests/integration/.artifacts --exclude=./node_modules -cf - . | tar -xf - -C ~/frappe-setup-cli'
+    CLI="./install.sh"
+    CLI_DIR="~/frappe-setup-cli"
+fi
 
 run_install() {
-    docker exec "${NAME}" bash -c "cd ~/frappe-setup-cli && ./install.sh install --non-interactive --yes \
+    docker exec "${NAME}" bash -c "cd ${CLI_DIR} && ${CLI} install --non-interactive --yes \
         --frappe-branch ${BRANCH} --site dev.localhost \
         --admin-password-file ~/admin.pw --db-root-password-file ~/db.pw ${EXTRA_ARGS[*]:-}"
 }
@@ -54,7 +76,7 @@ run_install 2>&1 | tee "${ART}/install-1.txt"
 echo "first install took $(( $(date +%s) - start ))s" | tee -a "${ART}/summary.txt"
 
 echo "== [2/4] status / doctor"
-docker exec "${NAME}" bash -c 'cd ~/frappe-setup-cli && .venv/bin/frappe-setup status && .venv/bin/frappe-setup doctor --share ~/report.json' 2>&1 | tee "${ART}/status-doctor.txt"
+docker exec "${NAME}" bash -c "cd ${CLI_DIR} && ${CLI} status && ${CLI} doctor --share ~/report.json" 2>&1 | tee "${ART}/status-doctor.txt"
 
 echo "== [3/4] rerun (must be idempotent)"
 start=$(date +%s)
@@ -63,11 +85,11 @@ echo "second install took $(( $(date +%s) - start ))s" | tee -a "${ART}/summary.
 grep -q "already exists" "${ART}/install-2.txt" || { echo "FAIL: rerun did not reuse the site"; exit 1; }
 
 echo "== [4/4] secret scan"
-if docker exec "${NAME}" bash -c "grep -rlF -e '${ADMIN_PW}' -e '${DB_PW}' ~/.local/state/frappe-setup ~/frappe-setup-cli ~/report.json 2>/dev/null"; then
+if docker exec "${NAME}" bash -c "grep -rlF -e '${ADMIN_PW}' -e '${DB_PW}' ~/.local/state/frappe-setup ~/.local/share/frappe-setup ~/.npm ~/frappe-setup-cli ~/report.json 2>/dev/null"; then
     echo "FAIL: a secret was found in the files listed above"; exit 1
 fi
 if grep -rlF -e "${ADMIN_PW}" -e "${DB_PW}" "${ART}"; then echo "FAIL: secret in console output"; exit 1; fi
 echo "no secrets found in logs, state, reports or console output" | tee -a "${ART}/summary.txt"
 
 docker exec "${NAME}" bash -c 'du -sh ~/frappe-projects/frappe-bench ~/.local/share/frappe-setup ~/.local/share/uv 2>/dev/null; df -h / | tail -1' 2>&1 | tee -a "${ART}/summary.txt"
-echo "PASS: ${BRANCH} ${EXTRA_ARGS[*]:-}" | tee -a "${ART}/summary.txt"
+echo "PASS (${VIA}): ${BRANCH} ${EXTRA_ARGS[*]:-}" | tee -a "${ART}/summary.txt"

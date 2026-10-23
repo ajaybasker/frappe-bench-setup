@@ -5,13 +5,24 @@
 #   ./install.sh check           read-only compatibility report
 #   ./install.sh <command> ...   any frappe-setup command / option (see --help)
 #
-# This script only prepares a private virtualenv (.venv) for the CLI inside this
-# repository. It asks before installing the one system package it may need (python3-venv).
+# This script only prepares a private virtualenv for the CLI. It asks before installing the
+# one system package it may need (python3-venv).
+#
+# Environment (used by the npm launcher; defaults suit a git checkout):
+#   FRAPPE_SETUP_VENV_DIR      where the virtualenv lives        (default: <repo>/.venv)
+#   FRAPPE_SETUP_INSTALL_MODE  editable | copy                    (default: editable)
+#       editable: `pip install -e <repo>` - the checkout is used live (development).
+#       copy:     a regular install from a staged copy, so the venv never depends on the
+#                 package directory (npm caches and global prefixes may be read-only or pruned).
 set -euo pipefail
 
 REPO_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-VENV_DIR="${REPO_DIR}/.venv"
+VENV_DIR="${FRAPPE_SETUP_VENV_DIR:-${REPO_DIR}/.venv}"
+INSTALL_MODE="${FRAPPE_SETUP_INSTALL_MODE:-editable}"
 STAMP="${VENV_DIR}/.frappe-setup-installed"
+[[ "${VENV_DIR}" == /* ]] || { printf 'FRAPPE_SETUP_VENV_DIR must be an absolute path\n' >&2; exit 2; }
+[[ "${INSTALL_MODE}" == "editable" || "${INSTALL_MODE}" == "copy" ]] \
+    || { printf 'FRAPPE_SETUP_INSTALL_MODE must be editable or copy\n' >&2; exit 2; }
 MIN_PY_MINOR=10
 
 say()  { printf '\033[1;36m==>\033[0m %s\n' "$*"; }
@@ -69,17 +80,37 @@ if [[ ! -x "${VENV_DIR}/bin/python" ]] && ! venv_works; then
     fi
 fi
 
-# (Re)install the CLI when the venv is missing or the project metadata changed.
-SOURCE_HASH="$(cat "${REPO_DIR}/pyproject.toml" | sha256sum | cut -d' ' -f1)"
+# (Re)install the CLI when the venv is missing or the installed sources changed.
+if [[ "${INSTALL_MODE}" == "copy" ]]; then
+    # Hash everything that ends up in the venv, so a new package version reinstalls.
+    SOURCE_HASH="$(cd "${REPO_DIR}" && find pyproject.toml src config -type f \( -name '*.py' -o -name '*.yaml' -o -name '*.toml' \) \
+        -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1)"
+else
+    SOURCE_HASH="$(sha256sum < "${REPO_DIR}/pyproject.toml" | cut -d' ' -f1)"
+fi
 if [[ ! -x "${VENV_DIR}/bin/frappe-setup" || ! -f "${STAMP}" || "$(cat "${STAMP}")" != "${SOURCE_HASH}" ]]; then
     say "Preparing the installer environment in ${VENV_DIR}"
+    mkdir -p "$(dirname -- "${VENV_DIR}")"
     "$PYTHON" -m venv "${VENV_DIR}"
     "${VENV_DIR}/bin/python" -m pip install --quiet --disable-pip-version-check --upgrade pip \
-        || die "Could not upgrade pip (network problem?). Rerun ./install.sh when online."
-    # Editable install: config/version-matrix.yaml in this checkout is used directly.
-    "${VENV_DIR}/bin/python" -m pip install --quiet --disable-pip-version-check -e "${REPO_DIR}" \
-        || die "Could not install the CLI dependencies (network problem?). Rerun ./install.sh when online."
+        || die "Could not upgrade pip (network problem?). Rerun when online."
+    if [[ "${INSTALL_MODE}" == "copy" ]]; then
+        STAGE="$(mktemp -d)"
+        cp -R "${REPO_DIR}/pyproject.toml" "${REPO_DIR}/README.md" "${REPO_DIR}/src" "${REPO_DIR}/config" "${STAGE}/"
+        [[ -f "${REPO_DIR}/LICENSE" ]] && cp "${REPO_DIR}/LICENSE" "${STAGE}/"
+        if ! "${VENV_DIR}/bin/python" -m pip install --quiet --disable-pip-version-check "${STAGE}"; then
+            rm -rf -- "${STAGE}"
+            die "Could not install the CLI dependencies (network problem?). Rerun when online."
+        fi
+        rm -rf -- "${STAGE}"
+    else
+        # Editable install: config/version-matrix.yaml in this checkout is used directly.
+        "${VENV_DIR}/bin/python" -m pip install --quiet --disable-pip-version-check -e "${REPO_DIR}" \
+            || die "Could not install the CLI dependencies (network problem?). Rerun ./install.sh when online."
+    fi
     echo "${SOURCE_HASH}" > "${STAMP}"
 fi
 
+# Messages name the command the user actually types (./install.sh resume, ...).
+export FRAPPE_SETUP_COMMAND="${FRAPPE_SETUP_COMMAND:-./install.sh}"
 exec "${VENV_DIR}/bin/frappe-setup" "$@"
